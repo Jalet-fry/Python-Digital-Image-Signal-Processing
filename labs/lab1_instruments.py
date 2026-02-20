@@ -3,7 +3,7 @@ import os
 import time
 import shutil
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Button
+from matplotlib.widgets import RadioButtons
 import numpy as np
 import mplcursors
 
@@ -11,14 +11,16 @@ import mplcursors
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
-from core.signals.generator import generate_instrument_signal
 from core.signals.fourier import dft, idft, fft, ifft
 from core.signals.math_ops import linear_convolution, fft_convolution, correlation, fft_correlation
+from core.signals.generator import generate_instrument_signal
 
+# Настройка стиля
 plt.rcParams['toolbar'] = 'None'
+plt.style.use('seaborn-v0_8-muted')
 
 # ==========================================================
-# 1. ПАРАМЕТРЫ (N=1024 ДЛЯ ВСЕХ)
+# 1. ПАРАМЕТРЫ (ВАРИАНТ №10)
 # ==========================================================
 config = {
     'x': {'name': 'Виолончель', 'A': [1.0, 0.6, 0.4, 0.2], 'f0': 110, 'h': [1, 2, 3, 4], 'phi': 0},
@@ -27,128 +29,121 @@ config = {
     'sr': 8000
 }
 
-N = config['N']
-sr = config['sr']
+N, sr = config['N'], config['sr']
 duration = N / sr
 
 # ==========================================================
-# 2. ОЧИСТКА СТАРЫХ ГРАФИКОВ
+# 2. РАСЧЕТЫ
 # ==========================================================
-plots_dir = os.path.join(BASE_DIR, "results", "plots")
-if os.path.exists(plots_dir):
-    shutil.rmtree(plots_dir) # Удаляем всё, чтобы не было дублей
-os.makedirs(plots_dir)
-
-# ==========================================================
-# 3. РАСЧЕТЫ
-# ==========================================================
-print(f"Выполняются тяжелые расчеты для N={N} (около 15 сек)...")
 t, x_raw = generate_instrument_signal(config['x']['A'], config['x']['f0'], config['x']['h'], config['x']['phi'], duration=duration, sr=sr)
 _, y_raw = generate_instrument_signal(config['y']['A'], config['y']['f0'], config['y']['h'], config['y']['phi'], duration=duration, sr=sr)
 
 x_s, y_s, t = x_raw[:N], y_raw[:N], t[:N]
 dt = t[1] - t[0]
 
-# Все считаем на полном N=1024
-dft_x, dft_y = dft(x_s), dft(y_s)
-fft_x, fft_y = fft(x_s), fft(y_s)
-idft_x, idft_y = idft(dft_x).real, idft(dft_y).real
-ifft_x, ifft_y = ifft(fft_x).real[:N], ifft(fft_y).real[:N]
+# Прямое/Обратное Фурье
+d_x, f_x, l_fx = dft(x_s), fft(x_s), np.fft.fft(x_s)
+d_y, f_y, l_fy = dft(y_s), fft(y_s), np.fft.fft(y_s)
+id_x, if_x = idft(d_x).real, ifft(f_x).real[:N]
+id_y, if_y = idft(d_y).real, ifft(f_y).real[:N]
 
-conv_man = linear_convolution(x_s, y_s)
-conv_fft = fft_convolution(x_s, y_s).real
-corr_man = correlation(x_s, y_s)
-corr_fft = fft_correlation(x_s, y_s).real
+# Операции
+c_m, c_f, c_l = linear_convolution(x_s, y_s), fft_convolution(x_s, y_s).real, np.convolve(x_s, y_s)
+cr_m, cr_f, cr_l = correlation(x_s, y_s), fft_correlation(x_s, y_s).real, np.correlate(x_s, y_s, mode='full')
 
-lib_fft_x, lib_fft_y = np.fft.fft(x_s), np.fft.fft(y_s)
-lib_conv, lib_corr = np.convolve(x_s, y_s), np.correlate(x_s, y_s, mode='full')
-
-# ==========================================================
-# 4. ПОДГОТОВКА И СОХРАНЕНИЕ (PNG)
-# ==========================================================
-def get_spec_plot(data):
+def get_clean(data, max_f=600):
     mag = np.abs(data) / (N / 2)
-    phase = np.angle(data)
-    phase[mag < 0.05 * np.max(mag)] = 0
-    freqs = np.fft.fftfreq(len(data), d=dt)
-    return freqs[:N//2], mag[:N//2], phase[:N//2]
+    ph = np.angle(data)
+    ph[mag < 0.001 * np.max(mag)] = 0
+    freqs = np.fft.fftfreq(N, d=dt)
+    idx = np.where(freqs[:N//2] <= max_f)[0][-1]
+    return freqs[:idx], mag[:idx], ph[:idx]
 
-f_dx, m_dx, p_dx = get_spec_plot(dft_x); f_fx, m_fx, p_fx = get_spec_plot(fft_x)
-f_dy, m_dy, p_dy = get_spec_plot(dft_y); f_fy, m_fy, p_fy = get_spec_plot(fft_y)
-f_lx, m_lx, p_lx = get_spec_plot(lib_fft_x); f_ly, m_ly, p_ly = get_spec_plot(lib_fft_y)
+f_dx, m_dx, p_dx = get_clean(d_x); f_fx, m_fx, p_fx = get_clean(f_x); f_lx, m_lx, p_lx = get_clean(l_fx)
+f_dy, m_dy, p_dy = get_clean(d_y); f_fy, m_fy, p_fy = get_clean(f_y); f_ly, m_ly, p_ly = get_clean(l_fy)
 
+# ==========================================================
+# 3. ВСЕ 24 ГРАФИКА ПО СПИСКУ
+# ==========================================================
 plots_data = [
-    (t*1000, x_s, "01. x(t) Оригинал", "plot", "blue", "ms"),
-    (t*1000, y_s, "02. y(t) Оригинал", "plot", "orange", "ms"),
-    (f_dx, m_dx, "03. x DFT Амплитуда", "stem", "blue", "Hz"),
-    (f_dx, p_dx, "04. x DFT Фаза", "stem", "blue", "Hz"),
-    (t*1000, idft_x, "05. x IDFT Восстановлен", "plot", "green", "ms"),
-    (f_fx, m_fx, "06. x FFT Амплитуда", "stem", "blue", "Hz"),
-    (f_fx, p_fx, "07. x FFT Фаза", "stem", "blue", "Hz"),
-    (t*1000, ifft_x, "08. x IFFT Восстановлен", "plot", "purple", "ms"),
-    (f_dy, m_dy, "09. y DFT Амплитуда", "stem", "orange", "Hz"),
-    (f_dy, p_dy, "10. y DFT Фаза", "stem", "orange", "Hz"),
-    (t*1000, idft_y, "11. y IDFT Восстановлен", "plot", "red", "ms"),
-    (f_fy, m_fy, "12. y FFT Амплитуда", "stem", "orange", "Hz"),
-    (f_fy, p_fy, "13. y FFT Фаза", "stem", "orange", "Hz"),
-    (t*1000, ifft_y, "14. y IFFT Восстановлен", "plot", "brown", "ms"),
-    (range(len(conv_man)), conv_man, "15. Свертка Вручную", "plot", "blue", "idx"),
-    (range(len(conv_fft)), conv_fft, "16. Свертка через БПФ", "plot", "cyan", "idx"),
-    (range(len(corr_man)), corr_man, "17. Корреляция Вручную", "plot", "gray", "idx"),
-    (range(len(corr_fft)), corr_fft, "18. Корреляция через БПФ", "plot", "black", "idx"),
-    (f_lx, m_lx, "19. x Lib FFT Амплитуда", "stem", "blue", "Hz"),
-    (f_lx, p_lx, "20. x Lib FFT Фаза", "stem", "blue", "Hz"),
-    (f_ly, m_ly, "21. y Lib FFT Амплитуда", "stem", "orange", "Hz"),
-    (f_ly, p_ly, "22. y Lib FFT Фаза", "stem", "orange", "Hz"),
-    (range(len(lib_conv)), lib_conv, "23. Lib Свертка", "plot", "green", "idx"),
-    (range(len(lib_corr)), lib_corr, "24. Lib Корреляция", "plot", "red", "idx"),
+    (t*1000, x_s, "x(t)", "plot", "blue", "ms"),                                  # 1
+    (t*1000, y_s, "y(t)", "plot", "orange", "ms"),                                # 2
+    (f_dx, m_dx, "x(t) ДПФ: амплитудный спектр", "stem", "blue", "Hz"),           # 3
+    (f_dx, p_dx, "x(t) ДПФ: фазовый спектр", "stem", "blue", "Hz"),               # 4
+    (t*1000, id_x, "x(t) ОДПФ", "plot", "green", "ms"),                           # 5
+    (f_fx, m_fx, "x(t) БПФ: амплитудный спектр", "stem", "blue", "Hz"),           # 6
+    (f_fx, p_fx, "x(t) БПФ: фазовый спектр", "stem", "blue", "Hz"),               # 7
+    (t*1000, if_x, "x(t) ОБПФ", "plot", "purple", "ms"),                          # 8
+    (f_dy, m_dy, "y(t) ДПФ: амплитудный спектр", "stem", "orange", "Hz"),         # 9
+    (f_dy, p_dy, "y(t) ДПФ: фазовый спектр", "stem", "orange", "Hz"),             # 10
+    (t*1000, id_y, "y(t) ОДПФ", "plot", "red", "ms"),                             # 11
+    (f_fy, m_fy, "y(t) БПФ: амплитудный спектр", "stem", "orange", "Hz"),         # 12
+    (f_fy, p_fy, "y(t) БПФ: фазовый спектр", "stem", "orange", "Hz"),             # 13
+    (t*1000, if_y, "y(t) ОБПФ", "plot", "brown", "ms"),                           # 14
+    (range(len(c_m)), c_m, "x(t) y(t) Свертка", "plot", "blue", "отсчеты"),       # 15
+    (range(len(c_f)), c_f, "x(t) y(t) Свертка через БПФ", "plot", "cyan", "idx"), # 16
+    (range(len(cr_m)), cr_m, "x(t) y(t) Корреляция", "plot", "gray", "idx"),      # 17
+    (range(len(cr_f)), cr_f, "x(t) y(t) Корреляция через БПФ", "plot", "black", "idx"), # 18
+    (f_lx, m_lx, "x(t) БПФ: амплитудный спектр (Lib)", "stem", "blue", "Hz"),     # 19
+    (f_lx, p_lx, "x(t) БПФ: фазовый спектр (Lib)", "stem", "blue", "Hz"),         # 20
+    (f_ly, m_ly, "y(t) БПФ: амплитудный спектр (Lib)", "stem", "orange", "Hz"),   # 21
+    (f_ly, p_ly, "y(t) БПФ: фазовый спектр (Lib)", "stem", "orange", "Hz"),       # 22
+    (range(len(c_l)), c_l, "x(t) y(t) Свертка (Lib)", "plot", "green", "idx"),    # 23
+    (range(len(cr_l)), cr_l, "x(t) y(t) Корреляция (Lib)", "plot", "red", "idx"), # 24
 ]
 
-for i, (x, y, title, p_type, color, unit) in enumerate(plots_data):
-    plt.figure(figsize=(10, 5))
-    if p_type == "plot": plt.plot(x, y, color=color, lw=1.2)
-    else: plt.stem(x, y, linefmt=color, markerfmt=' ', basefmt=" ")
-    plt.title(title); plt.xlabel(unit); plt.grid(True, alpha=0.3)
-    if unit == "Hz": plt.xlim(0, 1500)
-    plt.savefig(os.path.join(plots_dir, f"{title.replace(' ', '_')}.png"), dpi=120)
-    plt.close()
-
-print(f"[УСПЕХ] 24 графика обновлены в {plots_dir}")
+# Группировка для удобного сравнения в окне
+group_mapping = [
+    [0, 4, 7],   # 1, 5, 8 (x восстановление)
+    [1, 10, 13], # 2, 11, 14 (y восстановление)
+    [2, 5, 18],  # 3, 6, 19 (x спектр амп)
+    [3, 6, 19],  # 4, 7, 20 (x спектр фаз)
+    [8, 11, 20], # 9, 12, 21 (y спектр амп)
+    [9, 12, 21], # 10, 13, 22 (y спектр фаз)
+    [14, 15, 22],# 15, 16, 23 (свертка)
+    [16, 17, 23] # 17, 18, 24 (корреляция)
+]
 
 # ==========================================================
-# 5. ИНТЕРФЕЙС
+# 4. ИНТЕРФЕЙС
 # ==========================================================
-fig = plt.figure(figsize=(13, 9))
-n_rows, visible_rows, scroll_pos = 12, 3, 0
-axes = []
-gs = fig.add_gridspec(n_rows, 2, hspace=0.8)
+fig = plt.figure(figsize=(15, 10))
+fig.canvas.manager.set_window_title('Лабораторная работа №1 - Анализ сигналов (Вариант 10)')
 
-for i in range(24):
-    ax = fig.add_subplot(gs[i // 2, i % 2])
-    x, y, title, p_type, color, unit = plots_data[i]
-    if p_type == "plot": ax.plot(x, y, color=color, lw=1)
-    else: ax.stem(x, y, linefmt=color, markerfmt=' ', basefmt=" ")
-    ax.set_title(title, fontsize=9); ax.grid(True, alpha=0.2)
-    if unit == "Hz": ax.set_xlim(0, 1500)
-    axes.append(ax)
+ax_menu = plt.axes([0.02, 0.3, 0.16, 0.4], facecolor='#f0f0f0')
+menu_labels = [
+    '1. Восстановление X', '2. Восстановление Y',
+    '3. Спектр Амп. X', '4. Спектр Фаз. X',
+    '5. Спектр Амп. Y', '6. Спектр Фаз. Y',
+    '7. Свертка X * Y', '8. Корреляция X & Y'
+]
+radio = RadioButtons(ax_menu, menu_labels, active=0, activecolor='royalblue')
 
-def update():
-    for i, ax in enumerate(axes):
-        row = i // 2
-        if scroll_pos <= row < scroll_pos + visible_rows:
-            l_row = row - scroll_pos
-            ax.set_position([ax.get_position().x0, 0.88 - (l_row+1)*0.25, ax.get_position().width, 0.18])
-            ax.set_visible(True)
-        else: ax.set_visible(False)
+main_axes = [fig.add_subplot(3, 1, i+1) for i in range(3)]
+plt.subplots_adjust(left=0.22, right=0.96, top=0.94, bottom=0.06, hspace=0.35)
+
+def update_plots(label):
+    group_idx = menu_labels.index(label)
+    indices = group_mapping[group_idx]
+    
+    for i, p_idx in enumerate(indices):
+        ax = main_axes[i]
+        ax.clear()
+        x, y, title, p_type, color, unit = plots_data[p_idx]
+        
+        full_title = f"График №{p_idx + 1}: {title}"
+        
+        if p_type == "plot":
+            ax.plot(x, y, color=color, lw=1.5)
+        else:
+            ax.stem(x, y, linefmt=color, markerfmt='o', basefmt=" ")
+            
+        ax.set_title(full_title, fontsize=11, fontweight='bold')
+        ax.set_xlabel(unit, fontsize=9); ax.grid(True, alpha=0.3)
+
     fig.canvas.draw_idle()
 
-ax_p, ax_n = plt.axes([0.4, 0.02, 0.05, 0.04]), plt.axes([0.55, 0.02, 0.05, 0.04])
-b_p, b_n = Button(ax_p, '<'), Button(ax_n, '>')
-b_n.on_clicked(lambda e: change(1)); b_p.on_clicked(lambda e: change(-1))
-def change(d):
-    global scroll_pos
-    scroll_pos = max(0, min(scroll_pos + d, n_rows - visible_rows)); update()
-
-update()
-mplcursors.cursor(hover=True)
+radio.on_clicked(update_plots)
+update_plots(menu_labels[0])
+mplcursors.cursor(main_axes, hover=True)
 plt.show()
