@@ -3,9 +3,13 @@ import os
 import time
 import shutil
 import matplotlib.pyplot as plt
-from matplotlib.widgets import RadioButtons
+from matplotlib.widgets import RadioButtons, Button
 import numpy as np
 import mplcursors
+try:
+    import sounddevice as sd
+except ImportError:
+    sd = None
 
 # Настройка путей
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -63,7 +67,7 @@ f_dx, m_dx, p_dx = get_clean(d_x); f_fx, m_fx, p_fx = get_clean(f_x); f_lx, m_lx
 f_dy, m_dy, p_dy = get_clean(d_y); f_fy, m_fy, p_fy = get_clean(f_y); f_ly, m_ly, p_ly = get_clean(l_fy)
 
 # ==========================================================
-# 3. ВСЕ 24 ГРАФИКА ПО СПИСКУ
+# 3. ВСЕ 24 ГРАФИКА
 # ==========================================================
 plots_data = [
     (t*1000, x_s, "x(t)", "plot", "blue", "ms"),                                  # 1
@@ -92,16 +96,9 @@ plots_data = [
     (range(len(cr_l)), cr_l, "x(t) y(t) Корреляция (Lib)", "plot", "red", "idx"), # 24
 ]
 
-# Группировка для удобного сравнения в окне
 group_mapping = [
-    [0, 4, 7],   # 1, 5, 8 (x восстановление)
-    [1, 10, 13], # 2, 11, 14 (y восстановление)
-    [2, 5, 18],  # 3, 6, 19 (x спектр амп)
-    [3, 6, 19],  # 4, 7, 20 (x спектр фаз)
-    [8, 11, 20], # 9, 12, 21 (y спектр амп)
-    [9, 12, 21], # 10, 13, 22 (y спектр фаз)
-    [14, 15, 22],# 15, 16, 23 (свертка)
-    [16, 17, 23] # 17, 18, 24 (корреляция)
+    [0, 4, 7], [1, 10, 13], [2, 5, 18], [3, 6, 19],
+    [8, 11, 20], [9, 12, 21], [14, 15, 22], [16, 17, 23]
 ]
 
 # ==========================================================
@@ -110,7 +107,7 @@ group_mapping = [
 fig = plt.figure(figsize=(15, 10))
 fig.canvas.manager.set_window_title('Лабораторная работа №1 - Анализ сигналов (Вариант 10)')
 
-ax_menu = plt.axes([0.02, 0.3, 0.16, 0.4], facecolor='#f0f0f0')
+ax_menu = plt.axes([0.02, 0.4, 0.16, 0.35], facecolor='#f0f0f0')
 menu_labels = [
     '1. Восстановление X', '2. Восстановление Y',
     '3. Спектр Амп. X', '4. Спектр Фаз. X',
@@ -119,10 +116,30 @@ menu_labels = [
 ]
 radio = RadioButtons(ax_menu, menu_labels, active=0, activecolor='royalblue')
 
+# Кнопка звука (без Emoji для избежания ошибок шрифта)
+ax_play = plt.axes([0.02, 0.2, 0.16, 0.08])
+btn_play = Button(ax_play, 'Play Audio', color='lightgreen', hovercolor='lime')
+
+def play_audio(event):
+    if sd is None: return
+    sd.stop()
+    label = radio.value_selected
+    # Если выбрана группа с X, играем x_s. Если с Y - y_s. 
+    # Свертка/Корреляция длинные, для простоты играем x_s (основной сигнал)
+    sig = x_s if 'X' in label or 'свертка' in label.lower() or 'корреляция' in label.lower() else y_s
+    norm_sig = sig / (np.max(np.abs(sig)) + 1e-9)
+    print(f"Воспроизведение: {label}...")
+    sd.play(norm_sig, sr)
+
+btn_play.on_clicked(play_audio)
+
 main_axes = [fig.add_subplot(3, 1, i+1) for i in range(3)]
 plt.subplots_adjust(left=0.22, right=0.96, top=0.94, bottom=0.06, hspace=0.35)
 
+current_cursor = None
+
 def update_plots(label):
+    global current_cursor
     group_idx = menu_labels.index(label)
     indices = group_mapping[group_idx]
     
@@ -130,20 +147,28 @@ def update_plots(label):
         ax = main_axes[i]
         ax.clear()
         x, y, title, p_type, color, unit = plots_data[p_idx]
-        
         full_title = f"График №{p_idx + 1}: {title}"
-        
-        if p_type == "plot":
+        if p_type == "plot": 
             ax.plot(x, y, color=color, lw=1.5)
-        else:
+        else: 
             ax.stem(x, y, linefmt=color, markerfmt='o', basefmt=" ")
-            
         ax.set_title(full_title, fontsize=11, fontweight='bold')
         ax.set_xlabel(unit, fontsize=9); ax.grid(True, alpha=0.3)
+    
+    # ПЕРЕСОЗДАЕМ КУРСОР для новых данных на осях
+    if current_cursor:
+        current_cursor.remove()
+    
+    current_cursor = mplcursors.cursor(main_axes, hover=True)
+    
+    @current_cursor.connect("add")
+    def _(sel):
+        # Форматируем подпись, чтобы она всегда была видна и корректна
+        sel.annotation.set_text(f"x: {sel.target[0]:.2f}\ny: {sel.target[1]:.4f}")
+        sel.annotation.get_bbox_patch().set(fc="white", alpha=0.8, boxstyle="round")
 
     fig.canvas.draw_idle()
 
 radio.on_clicked(update_plots)
 update_plots(menu_labels[0])
-mplcursors.cursor(main_axes, hover=True)
 plt.show()
