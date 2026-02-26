@@ -1,49 +1,68 @@
 import numpy as np
-from .fourier import fft, ifft
 
-def hamming_window(n: int) -> np.ndarray:
+def moving_average_recursive(x, M):
     """
-    Создает окно Хемминга заданной длины.
+    Рекурсивный однородный фильтр (Moving Average).
+    y[n] = y[n-1] + (x[n] - x[n-M]) / M
     """
-    return 0.54 - 0.46 * np.cos(2 * np.pi * np.arange(n) / (n - 1))
-
-def reject_filter(signal: np.ndarray, window_length: int = 9) -> np.ndarray:
-    """
-    Режекторный фильтр с использованием окна Хемминга.
-    """
-    n = len(signal)
-    cutoff_frequency = 0.05
+    y = np.zeros_like(x)
+    current_sum = np.sum(x[:M])
+    y[M-1] = current_sum / M
     
-    # 1. Рассчитываем коэффициенты фильтра
-    filter_coeffs = np.zeros(n)
-    for i in range(n):
-        temp = i - window_length / 2
-        # Коэффициент режекции (упрощенная модель из вашего TS кода)
-        coeff = 1 - 2 * cutoff_frequency * np.cos(2 * np.pi * temp * i / n) + cutoff_frequency
-        
-        # Окно Хемминга
-        if i < window_length:
-            hamming = 0.54 - 0.46 * np.cos(2 * np.pi * i / (window_length - 1))
-        else:
-            hamming = 0
-            
-        filter_coeffs[i] = coeff * hamming
+    for n in range(M, len(x)):
+        current_sum += x[n] - x[n-M]
+        y[n] = current_sum / M
+    return y
 
-    # 2. Нормализация фильтра
-    filter_sum = np.sum(filter_coeffs)
-    if filter_sum != 0:
-        filter_coeffs /= filter_sum
-
-    # 3. Фильтрация через спектральную область (согласно логике вашего TS)
-    spec_signal = fft(signal)
+def fir_window_bandpass(f_low, f_high, M, sr=8000):
+    """
+    КИХ-фильтр полосовой (Bandpass) методом окон.
+    Использует окно Блэкмана (Blackman).
+    """
+    # Нормированные частоты
+    w_low = 2 * np.pi * f_low / sr
+    w_high = 2 * np.pi * f_high / sr
     
-    # Свертка в спектральной области (в TS у вас была свертка спектра и фильтра)
-    # ПРИМЕЧАНИЕ: В классическом DSP фильтрация — это свертка СИГНАЛА и фильтра 
-    # (или умножение их спектров). Я сохраняю структуру вашей логики:
-    result_spec = np.zeros(n, dtype=complex)
-    for i in range(n):
-        for j in range(window_length):
-            if i - j >= 0:
-                result_spec[i] += spec_signal[i - j] * filter_coeffs[j]
-                
-    return ifft(result_spec)
+    n = np.arange(M)
+    center = (M - 1) / 2
+    
+    # Идеальный полосовой фильтр (разность двух ФНЧ)
+    # h[n] = sin(w_high*(n-mid)) / (pi*(n-mid)) - sin(w_low*(n-mid)) / (pi*(n-mid))
+    def sinc(w, n, mid):
+        res = np.zeros_like(n, dtype=float)
+        idx = (n != mid)
+        res[idx] = np.sin(w * (n[idx] - mid)) / (np.pi * (n[idx] - mid))
+        res[~idx] = w / np.pi
+        return res
+
+    h = sinc(w_high, n, center) - sinc(w_low, n, center)
+    
+    # Окно Блэкмана
+    window = 0.42 - 0.5 * np.cos(2 * np.pi * n / (M - 1)) + 0.08 * np.cos(4 * np.pi * n / (M - 1))
+    
+    return h * window
+
+def iir_bandpass(f0, bw, sr=8000):
+    """
+    БИХ-фильтр полосовой (Резонансный биквадрат).
+    f0 - центральная частота, bw - полоса пропускания.
+    Возвращает коэффициенты (a, b) для разностного уравнения.
+    """
+    omega = 2 * np.pi * f0 / sr
+    sn = np.sin(omega)
+    cs = np.cos(omega)
+    # Коэффициент затухания (Q-factor связан с BW)
+    alpha = sn * np.sinh(np.log(2)/2 * bw * omega / sn)
+    
+    b = [alpha, 0, -alpha]
+    a = [1 + alpha, -2 * cs, 1 - alpha]
+    
+    # Нормировка по a0
+    return np.array(b) / a[0], np.array(a) / a[0]
+
+def apply_iir(x, b, a):
+    """Применяет БИХ-фильтр через разностное уравнение."""
+    y = np.zeros_like(x)
+    for n in range(len(x)):
+        y[n] = b[0]*x[n] + b[1]*x[n-1] + b[2]*x[n-2] - a[1]*y[n-1] - a[2]*y[n-2]
+    return y

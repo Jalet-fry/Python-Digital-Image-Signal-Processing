@@ -1,6 +1,10 @@
-# Переходим в директорию скрипта (корень проекта)
-Set-Location -Path $PSScriptRoot
+Write-Host "Запуск главного меню ЦОСиИ..." -ForegroundColor Cyan
 
-# Запускаем Python для первой лабораторной
-Write-Host "Запуск Лабораторной №1..." -ForegroundColor Cyan
-python ./labs/lab1_instruments.py
+# Путь к главному файлу
+$MainScript = Join-Path $PSScriptRoot "main.py"
+
+if (Test-Path $MainScript) {
+    python $MainScript
+} else {
+    Write-Host "Ошибка: Файл main.py не найден!" -ForegroundColor Red
+}
