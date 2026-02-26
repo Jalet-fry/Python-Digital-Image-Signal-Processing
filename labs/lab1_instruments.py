@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import RadioButtons, Button
 import numpy as np
 import mplcursors
+from scipy.io import wavfile
+from scipy.signal import fftconvolve
+
 try:
     import sounddevice as sd
 except ImportError:
@@ -30,17 +33,19 @@ config = {
     'x': {'name': 'Виолончель', 'A': [1.0, 0.6, 0.4, 0.2], 'f0': 110, 'h': [1, 2, 3, 4], 'phi': 0},
     'y': {'name': 'Контрабас', 'A': [1.0, 0.7, 0.5], 'f0': 55, 'h': [1, 2, 3], 'phi': 0},
     'N': 1024,
-    'sr': 8000
+    'sr': 8000,
+    'sr_audio': 44100,
+    'duration_audio': 3.0
 }
 
 N, sr = config['N'], config['sr']
-duration = N / sr
+sr_a, dur_a = config['sr_audio'], config['duration_audio']
 
 # ==========================================================
-# 2. РАСЧЕТЫ
+# 2. РАСЧЕТЫ (ДЛЯ ГРАФИКОВ - КОРОТКИЕ)
 # ==========================================================
-t, x_raw = generate_instrument_signal(config['x']['A'], config['x']['f0'], config['x']['h'], config['x']['phi'], duration=duration, sr=sr)
-_, y_raw = generate_instrument_signal(config['y']['A'], config['y']['f0'], config['y']['h'], config['y']['phi'], duration=duration, sr=sr)
+t, x_raw = generate_instrument_signal(config['x']['A'], config['x']['f0'], config['x']['h'], config['x']['phi'], duration=N/sr, sr=sr)
+_, y_raw = generate_instrument_signal(config['y']['A'], config['y']['f0'], config['y']['h'], config['y']['phi'], duration=N/sr, sr=sr)
 
 x_s, y_s, t = x_raw[:N], y_raw[:N], t[:N]
 dt = t[1] - t[0]
@@ -55,6 +60,12 @@ id_y, if_y = idft(d_y).real, ifft(f_y).real[:N]
 c_m, c_f, c_l = linear_convolution(x_s, y_s), fft_convolution(x_s, y_s).real, np.convolve(x_s, y_s)
 cr_m, cr_f, cr_l = correlation(x_s, y_s), fft_correlation(x_s, y_s).real, np.correlate(x_s, y_s, mode='full')
 
+# ==========================================================
+# 2.1 ГЕНЕРАЦИЯ ДЛИННОГО ЗВУКА (ДЛЯ AUDIO)
+# ==========================================================
+_, x_audio = generate_instrument_signal(config['x']['A'], config['x']['f0'], config['x']['h'], config['x']['phi'], duration=dur_a, sr=sr_a)
+_, y_audio = generate_instrument_signal(config['y']['A'], config['y']['f0'], config['y']['h'], config['y']['phi'], duration=dur_a, sr=sr_a)
+
 def get_clean(data, max_f=600):
     mag = np.abs(data) / (N / 2)
     ph = np.angle(data)
@@ -65,6 +76,8 @@ def get_clean(data, max_f=600):
 
 f_dx, m_dx, p_dx = get_clean(d_x); f_fx, m_fx, p_fx = get_clean(f_x); f_lx, m_lx, p_lx = get_clean(l_fx)
 f_dy, m_dy, p_dy = get_clean(d_y); f_fy, m_fy, p_fy = get_clean(f_y); f_ly, m_ly, p_ly = get_clean(l_fy)
+
+errors = [np.max(np.abs(x_s - id_x)), np.max(np.abs(x_s - if_x)), np.max(np.abs(x_s - np.fft.ifft(l_fx).real)), np.max(np.abs(c_m - c_l)), np.max(np.abs(cr_m - cr_l))]
 
 # ==========================================================
 # 3. ВСЕ 24 ГРАФИКА
@@ -96,10 +109,7 @@ plots_data = [
     (range(len(cr_l)), cr_l, "x(t) y(t) Корреляция (Lib)", "plot", "red", "idx"), # 24
 ]
 
-group_mapping = [
-    [0, 4, 7], [1, 10, 13], [2, 5, 18], [3, 6, 19],
-    [8, 11, 20], [9, 12, 21], [14, 15, 22], [16, 17, 23]
-]
+group_mapping = [[0, 4, 7], [1, 10, 13], [2, 5, 18], [3, 6, 19], [8, 11, 20], [9, 12, 21], [14, 15, 22], [16, 17, 23]]
 
 # ==========================================================
 # 4. ИНТЕРФЕЙС
@@ -107,68 +117,98 @@ group_mapping = [
 fig = plt.figure(figsize=(15, 10))
 fig.canvas.manager.set_window_title('Лабораторная работа №1 - Анализ сигналов (Вариант 10)')
 
-ax_menu = plt.axes([0.02, 0.4, 0.16, 0.35], facecolor='#f0f0f0')
-menu_labels = [
-    '1. Восстановление X', '2. Восстановление Y',
-    '3. Спектр Амп. X', '4. Спектр Фаз. X',
-    '5. Спектр Амп. Y', '6. Спектр Фаз. Y',
-    '7. Свертка X * Y', '8. Корреляция X & Y'
-]
+ax_menu = plt.axes([0.02, 0.45, 0.16, 0.4], facecolor='#f0f0f0')
+menu_labels = ['1. Восстановление X', '2. Восстановление Y', '3. Спектр Амп. X', '4. Спектр Фаз. X', '5. Спектр Амп. Y', '6. Спектр Фаз. Y', '7. Свертка X * Y', '8. Корреляция X & Y', '9. Гистограмма ошибок']
 radio = RadioButtons(ax_menu, menu_labels, active=0, activecolor='royalblue')
 
-# Кнопка звука (без Emoji для избежания ошибок шрифта)
-ax_play = plt.axes([0.02, 0.2, 0.16, 0.08])
-btn_play = Button(ax_play, 'Play Audio', color='lightgreen', hovercolor='lime')
+ax_play = plt.axes([0.02, 0.3, 0.16, 0.06]); btn_play = Button(ax_play, 'Play Audio', color='lightgreen', hovercolor='lime')
+ax_save_wav = plt.axes([0.02, 0.22, 0.16, 0.06]); btn_save_wav = Button(ax_save_wav, 'Save WAV', color='lightblue', hovercolor='deepskyblue')
+ax_save_graphs = plt.axes([0.02, 0.14, 0.16, 0.06]); btn_save_graphs = Button(ax_save_graphs, 'Save Results', color='peachpuff', hovercolor='orange')
+
+# Статус-бар внизу
+status_text = fig.text(0.02, 0.02, "Ready", fontsize=10, color='darkblue', fontweight='bold')
+
+def set_status(msg, color='darkblue'):
+    status_text.set_text(msg)
+    status_text.set_color(color)
+    fig.canvas.draw_idle()
+
+def get_audio_signal(label):
+    if 'X' in label: return x_audio
+    if 'Y' in label: return y_audio
+    if 'Свертка' in label or '7.' in label: 
+        # Используем БЫСТРУЮ свертку для звука
+        return fftconvolve(x_audio, y_audio, mode='full')[:int(sr_a * dur_a)]
+    if 'Корреляция' in label or '8.' in label: 
+        return fftconvolve(x_audio, y_audio[::-1], mode='full')
+    return x_audio
 
 def play_audio(event):
     if sd is None: return
+    set_status("Processing audio...", "orange")
     sd.stop()
     label = radio.value_selected
-    # Если выбрана группа с X, играем x_s. Если с Y - y_s. 
-    # Свертка/Корреляция длинные, для простоты играем x_s (основной сигнал)
-    sig = x_s if 'X' in label or 'свертка' in label.lower() or 'корреляция' in label.lower() else y_s
+    sig = get_audio_signal(label)
     norm_sig = sig / (np.max(np.abs(sig)) + 1e-9)
-    print(f"Воспроизведение: {label}...")
-    sd.play(norm_sig, sr)
+    set_status(f"🎵 Playing: {label}", "green")
+    sd.play(norm_sig, sr_a)
 
-btn_play.on_clicked(play_audio)
+def save_wav_files(event):
+    set_status("Saving WAV files...", "orange")
+    audio_dir = os.path.join(BASE_DIR, "results", "audio"); os.makedirs(audio_dir, exist_ok=True)
+    conv_audio = fftconvolve(x_audio, y_audio, mode='full')[:int(sr_a*dur_a)]
+    
+    for name, sig in [("x_cello", x_audio), ("y_double_bass", y_audio), ("convolution", conv_audio)]:
+        norm_sig = sig / (np.max(np.abs(sig)) + 1e-9)
+        wavfile.write(os.path.join(audio_dir, f"{name}.wav"), sr_a, np.int16(norm_sig * 32767))
+    
+    set_status(f"✅ Saved to: results/audio/", "darkgreen")
 
+def save_results(event):
+    set_status("Saving graphs...", "orange")
+    plots_dir = os.path.join(BASE_DIR, "results", "graphs"); os.makedirs(plots_dir, exist_ok=True)
+    current_label = radio.value_selected.split('.')[0]
+    fig.savefig(os.path.join(plots_dir, f"group_{current_label}.png"), dpi=150)
+    
+    err_fig = plt.figure(figsize=(10, 6))
+    plt.bar(['ДПФ', 'БПФ', 'NumPy', 'Свертка', 'Корреляция'], errors, color=['red', 'orange', 'green', 'blue', 'purple'])
+    plt.yscale('log'); plt.title("Ошибки реализаций (дополнительно)"); plt.ylabel("Макс. ошибка"); plt.grid(True, alpha=0.3, which='both')
+    for i, v in enumerate(errors): plt.text(i, v, f"{v:.1e}", ha='center', va='bottom')
+    err_fig.savefig(os.path.join(plots_dir, "additional_errors.png"), dpi=150); plt.close(err_fig)
+    
+    set_status(f"✅ Saved to: results/graphs/", "darkgreen")
+
+btn_play.on_clicked(play_audio); btn_save_wav.on_clicked(save_wav_files); btn_save_graphs.on_clicked(save_results)
 main_axes = [fig.add_subplot(3, 1, i+1) for i in range(3)]
-plt.subplots_adjust(left=0.22, right=0.96, top=0.94, bottom=0.06, hspace=0.35)
-
+plt.subplots_adjust(left=0.22, right=0.96, top=0.94, bottom=0.08, hspace=0.35)
 current_cursor = None
 
 def update_plots(label):
     global current_cursor
-    group_idx = menu_labels.index(label)
-    indices = group_mapping[group_idx]
-    
-    for i, p_idx in enumerate(indices):
-        ax = main_axes[i]
-        ax.clear()
-        x, y, title, p_type, color, unit = plots_data[p_idx]
-        full_title = f"График №{p_idx + 1}: {title}"
-        if p_type == "plot": 
-            ax.plot(x, y, color=color, lw=1.5)
-        else: 
-            ax.stem(x, y, linefmt=color, markerfmt='o', basefmt=" ")
-        ax.set_title(full_title, fontsize=11, fontweight='bold')
-        ax.set_xlabel(unit, fontsize=9); ax.grid(True, alpha=0.3)
-    
-    # ПЕРЕСОЗДАЕМ КУРСОР для новых данных на осях
-    if current_cursor:
-        current_cursor.remove()
-    
+    set_status(f"Selected: {label}")
+    if 'Гистограмма' in label:
+        for i, ax in enumerate(main_axes):
+            ax.clear()
+            if i == 0:
+                ax.bar(['ДПФ', 'БПФ', 'NumPy', 'Свертка', 'Корреляция'], errors, color=['red', 'orange', 'green', 'blue', 'purple'])
+                ax.set_yscale('log'); ax.set_title("Ошибки реализаций (максимальная разность с эталоном)"); ax.grid(True, alpha=0.3, which='both')
+                for j, v in enumerate(errors): ax.text(j, v, f"{j:.1e}" if j < 0 else f"{v:.1e}", ha='center', va='bottom')
+            else: ax.axis('off')
+    else:
+        indices = group_mapping[menu_labels.index(label)]
+        for i, p_idx in enumerate(indices):
+            ax = main_axes[i]; ax.set_axis_on(); ax.clear()
+            x, y, title, p_type, color, unit = plots_data[p_idx]
+            ax.set_title(f"График №{p_idx + 1}: {title}", fontsize=11, fontweight='bold')
+            if p_type == "plot": ax.plot(x, y, color=color, lw=1.5)
+            else: ax.stem(x, y, linefmt=color, markerfmt='o', basefmt=" ")
+            ax.set_xlabel(unit, fontsize=9); ax.grid(True, alpha=0.3)
+    if current_cursor: current_cursor.remove()
     current_cursor = mplcursors.cursor(main_axes, hover=True)
-    
     @current_cursor.connect("add")
     def _(sel):
-        # Форматируем подпись, чтобы она всегда была видна и корректна
         sel.annotation.set_text(f"x: {sel.target[0]:.2f}\ny: {sel.target[1]:.4f}")
         sel.annotation.get_bbox_patch().set(fc="white", alpha=0.8, boxstyle="round")
-
     fig.canvas.draw_idle()
 
-radio.on_clicked(update_plots)
-update_plots(menu_labels[0])
-plt.show()
+radio.on_clicked(update_plots); update_plots(menu_labels[0]); plt.show()
