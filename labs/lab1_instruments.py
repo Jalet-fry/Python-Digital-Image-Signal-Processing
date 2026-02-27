@@ -23,6 +23,7 @@ from core.signals.fourier import dft, idft, fft, ifft
 from core.signals.math_ops import linear_convolution, fft_convolution, correlation, fft_correlation
 from core.signals.generator import generate_instrument_signal
 from core.config_variants import get_lab_config  # 2. Добавлен импорт конфига
+from core.utils.aspects import DSPContext # 3. Добавлен импорт аспекта для логов
 
 # ==========================================================
 # 0. ЧТЕНИЕ ВАРИАНТА ИЗ АРГУМЕНТОВ (Универсальность)
@@ -31,6 +32,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--variant', type=int, default=10)
 args = parser.parse_known_args()[0]
 VARIANT = args.variant
+
+# Активация контекста логов (AOP)
+DSPContext.variant = VARIANT
+DSPContext.current_lab = "lab1"
 
 # Получаем данные динамически
 cfg = get_lab_config(1, VARIANT)
@@ -170,6 +175,7 @@ def save_wav_files(event):
     audio_dir = os.path.join(BASE_DIR, "results", "audio"); os.makedirs(audio_dir, exist_ok=True)
     conv_audio = fftconvolve(x_audio, y_audio, mode='full')[:int(sr_a*dur_a)]
     
+    # Имена файлов теперь зависят от имен инструментов в конфиге
     name_x = cfg['x']['name'].replace(" ", "_").lower()
     name_y = cfg['y']['name'].replace(" ", "_").lower()
     
