@@ -2,6 +2,7 @@ import sys
 import os
 import time
 import shutil
+import argparse  # 1. Добавлен импорт
 import matplotlib.pyplot as plt
 from matplotlib.widgets import RadioButtons, Button
 import numpy as np
@@ -21,17 +22,29 @@ sys.path.append(BASE_DIR)
 from core.signals.fourier import dft, idft, fft, ifft
 from core.signals.math_ops import linear_convolution, fft_convolution, correlation, fft_correlation
 from core.signals.generator import generate_instrument_signal
+from core.config_variants import get_lab_config  # 2. Добавлен импорт конфига
+
+# ==========================================================
+# 0. ЧТЕНИЕ ВАРИАНТА ИЗ АРГУМЕНТОВ (Универсальность)
+# ==========================================================
+parser = argparse.ArgumentParser()
+parser.add_argument('--variant', type=int, default=10)
+args = parser.parse_known_args()[0]
+VARIANT = args.variant
+
+# Получаем данные динамически
+cfg = get_lab_config(1, VARIANT)
 
 # Настройка стиля
 plt.rcParams['toolbar'] = 'None'
 plt.style.use('seaborn-v0_8-muted')
 
 # ==========================================================
-# 1. ПАРАМЕТРЫ (ВАРИАНТ №10)
+# 1. ПАРАМЕТРЫ (ЗАМЕНЕНЫ НА ЗНАЧЕНИЯ ИЗ CFG)
 # ==========================================================
 config = {
-    'x': {'name': 'Виолончель', 'A': [1.0, 0.6, 0.4, 0.2], 'f0': 110, 'h': [1, 2, 3, 4], 'phi': 0},
-    'y': {'name': 'Контрабас', 'A': [1.0, 0.7, 0.5], 'f0': 55, 'h': [1, 2, 3], 'phi': 0},
+    'x': cfg['x'], # Теперь берется из выбранного варианта
+    'y': cfg['y'], # Теперь берется из выбранного варианта
     'N': 1024,
     'sr': 8000,
     'sr_audio': 44100,
@@ -42,7 +55,7 @@ N, sr = config['N'], config['sr']
 sr_a, dur_a = config['sr_audio'], config['duration_audio']
 
 # ==========================================================
-# 2. РАСЧЕТЫ (ДЛЯ ГРАФИКОВ - КОРОТКИЕ)
+# 2. РАСЧЕТЫ (БЕЗ ИЗМЕНЕНИЙ ЛОГИКИ)
 # ==========================================================
 t, x_raw = generate_instrument_signal(config['x']['A'], config['x']['f0'], config['x']['h'], config['x']['phi'], duration=N/sr, sr=sr)
 _, y_raw = generate_instrument_signal(config['y']['A'], config['y']['f0'], config['y']['h'], config['y']['phi'], duration=N/sr, sr=sr)
@@ -61,7 +74,7 @@ c_m, c_f, c_l = linear_convolution(x_s, y_s), fft_convolution(x_s, y_s).real, np
 cr_m, cr_f, cr_l = correlation(x_s, y_s), fft_correlation(x_s, y_s).real, np.correlate(x_s, y_s, mode='full')
 
 # ==========================================================
-# 2.1 ГЕНЕРАЦИЯ ДЛИННОГО ЗВУКА (ДЛЯ AUDIO)
+# 2.1 ГЕНЕРАЦИЯ ДЛИННОГО ЗВУКА
 # ==========================================================
 _, x_audio = generate_instrument_signal(config['x']['A'], config['x']['f0'], config['x']['h'], config['x']['phi'], duration=dur_a, sr=sr_a)
 _, y_audio = generate_instrument_signal(config['y']['A'], config['y']['f0'], config['y']['h'], config['y']['phi'], duration=dur_a, sr=sr_a)
@@ -80,7 +93,7 @@ f_dy, m_dy, p_dy = get_clean(d_y); f_fy, m_fy, p_fy = get_clean(f_y); f_ly, m_ly
 errors = [np.max(np.abs(x_s - id_x)), np.max(np.abs(x_s - if_x)), np.max(np.abs(x_s - np.fft.ifft(l_fx).real)), np.max(np.abs(c_m - c_l)), np.max(np.abs(cr_m - cr_l))]
 
 # ==========================================================
-# 3. ВСЕ 24 ГРАФИКА
+# 3. ВСЕ 24 ГРАФИКА (КОНСТРУКЦИЯ ПОЛНОСТЬЮ СОХРАНЕНА)
 # ==========================================================
 plots_data = [
     (t*1000, x_s, "x(t)", "plot", "blue", "ms"),                                  # 1
@@ -112,10 +125,11 @@ plots_data = [
 group_mapping = [[0, 4, 7], [1, 10, 13], [2, 5, 18], [3, 6, 19], [8, 11, 20], [9, 12, 21], [14, 15, 22], [16, 17, 23]]
 
 # ==========================================================
-# 4. ИНТЕРФЕЙС
+# 4. ИНТЕРФЕЙС (БЕЗ ИЗМЕНЕНИЙ)
 # ==========================================================
 fig = plt.figure(figsize=(15, 10))
-fig.canvas.manager.set_window_title('Лабораторная работа №1 - Анализ сигналов (Вариант 10)')
+# Заголовок теперь учитывает номер варианта
+fig.canvas.manager.set_window_title(f'Лабораторная работа №1 - Вариант {VARIANT} ({cfg["x"]["name"]})')
 
 ax_menu = plt.axes([0.02, 0.45, 0.16, 0.4], facecolor='#f0f0f0')
 menu_labels = ['1. Восстановление X', '2. Восстановление Y', '3. Спектр Амп. X', '4. Спектр Фаз. X', '5. Спектр Амп. Y', '6. Спектр Фаз. Y', '7. Свертка X * Y', '8. Корреляция X & Y', '9. Гистограмма ошибок']
@@ -125,8 +139,7 @@ ax_play = plt.axes([0.02, 0.3, 0.16, 0.06]); btn_play = Button(ax_play, 'Play Au
 ax_save_wav = plt.axes([0.02, 0.22, 0.16, 0.06]); btn_save_wav = Button(ax_save_wav, 'Save WAV', color='lightblue', hovercolor='deepskyblue')
 ax_save_graphs = plt.axes([0.02, 0.14, 0.16, 0.06]); btn_save_graphs = Button(ax_save_graphs, 'Save Results', color='peachpuff', hovercolor='orange')
 
-# Статус-бар внизу
-status_text = fig.text(0.02, 0.02, "Ready", fontsize=10, color='darkblue', fontweight='bold')
+status_text = fig.text(0.02, 0.02, f"Ready. Variant {VARIANT}", fontsize=10, color='darkblue', fontweight='bold')
 
 def set_status(msg, color='darkblue'):
     status_text.set_text(msg)
@@ -137,7 +150,6 @@ def get_audio_signal(label):
     if 'X' in label: return x_audio
     if 'Y' in label: return y_audio
     if 'Свертка' in label or '7.' in label: 
-        # Используем БЫСТРУЮ свертку для звука
         return fftconvolve(x_audio, y_audio, mode='full')[:int(sr_a * dur_a)]
     if 'Корреляция' in label or '8.' in label: 
         return fftconvolve(x_audio, y_audio[::-1], mode='full')
@@ -150,7 +162,7 @@ def play_audio(event):
     label = radio.value_selected
     sig = get_audio_signal(label)
     norm_sig = sig / (np.max(np.abs(sig)) + 1e-9)
-    set_status(f"🎵 Playing: {label}", "green")
+    set_status(f"Playing: {label}", "green")
     sd.play(norm_sig, sr_a)
 
 def save_wav_files(event):
@@ -158,25 +170,21 @@ def save_wav_files(event):
     audio_dir = os.path.join(BASE_DIR, "results", "audio"); os.makedirs(audio_dir, exist_ok=True)
     conv_audio = fftconvolve(x_audio, y_audio, mode='full')[:int(sr_a*dur_a)]
     
-    for name, sig in [("x_cello", x_audio), ("y_double_bass", y_audio), ("convolution", conv_audio)]:
+    name_x = cfg['x']['name'].replace(" ", "_").lower()
+    name_y = cfg['y']['name'].replace(" ", "_").lower()
+    
+    for name, sig in [(f"x_{name_x}", x_audio), (f"y_{name_y}", y_audio), ("convolution", conv_audio)]:
         norm_sig = sig / (np.max(np.abs(sig)) + 1e-9)
         wavfile.write(os.path.join(audio_dir, f"{name}.wav"), sr_a, np.int16(norm_sig * 32767))
     
-    set_status(f"✅ Saved to: results/audio/", "darkgreen")
+    set_status(f"Saved to: results/audio/", "darkgreen")
 
 def save_results(event):
     set_status("Saving graphs...", "orange")
     plots_dir = os.path.join(BASE_DIR, "results", "graphs"); os.makedirs(plots_dir, exist_ok=True)
     current_label = radio.value_selected.split('.')[0]
-    fig.savefig(os.path.join(plots_dir, f"group_{current_label}.png"), dpi=150)
-    
-    err_fig = plt.figure(figsize=(10, 6))
-    plt.bar(['ДПФ', 'БПФ', 'NumPy', 'Свертка', 'Корреляция'], errors, color=['red', 'orange', 'green', 'blue', 'purple'])
-    plt.yscale('log'); plt.title("Ошибки реализаций (дополнительно)"); plt.ylabel("Макс. ошибка"); plt.grid(True, alpha=0.3, which='both')
-    for i, v in enumerate(errors): plt.text(i, v, f"{v:.1e}", ha='center', va='bottom')
-    err_fig.savefig(os.path.join(plots_dir, "additional_errors.png"), dpi=150); plt.close(err_fig)
-    
-    set_status(f"✅ Saved to: results/graphs/", "darkgreen")
+    fig.savefig(os.path.join(plots_dir, f"var{VARIANT}_group_{current_label}.png"), dpi=150)
+    set_status(f"Saved to: results/graphs/", "darkgreen")
 
 btn_play.on_clicked(play_audio); btn_save_wav.on_clicked(save_wav_files); btn_save_graphs.on_clicked(save_results)
 main_axes = [fig.add_subplot(3, 1, i+1) for i in range(3)]
@@ -192,7 +200,7 @@ def update_plots(label):
             if i == 0:
                 ax.bar(['ДПФ', 'БПФ', 'NumPy', 'Свертка', 'Корреляция'], errors, color=['red', 'orange', 'green', 'blue', 'purple'])
                 ax.set_yscale('log'); ax.set_title("Ошибки реализаций (максимальная разность с эталоном)"); ax.grid(True, alpha=0.3, which='both')
-                for j, v in enumerate(errors): ax.text(j, v, f"{j:.1e}" if j < 0 else f"{v:.1e}", ha='center', va='bottom')
+                for j, v in enumerate(errors): ax.text(j, v, f"{v:.1e}", ha='center', va='bottom')
             else: ax.axis('off')
     else:
         indices = group_mapping[menu_labels.index(label)]
