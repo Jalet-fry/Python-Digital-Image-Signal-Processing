@@ -4,6 +4,24 @@ import os
 import sys
 import subprocess
 import threading
+import importlib
+
+def check_dependencies():
+    required = ["numpy", "matplotlib", "scipy", "mplcursors"]
+    missing = []
+    for lib in required:
+        try:
+            importlib.import_module(lib)
+        except ImportError:
+            missing.append(lib)
+    
+    if missing:
+        msg = f"Отсутствуют необходимые библиотеки: {', '.join(missing)}\n\n" \
+              f"Пожалуйста, запустите 'install_deps.bat' или выполните:\n" \
+              f"pip install -r requirements.txt"
+        messagebox.showerror("Ошибка зависимостей", msg)
+        return False
+    return True
 
 def run_lab(lab_name):
     script_path = os.path.join(os.path.dirname(__file__), "labs", f"{lab_name}.py")
@@ -28,8 +46,14 @@ def run_lab(lab_name):
 
 root = tk.Tk()
 root.title("DSP Station")
-root.geometry("400x300")
+root.geometry("400x350")
 root.configure(bg="#2c3e50")
+
+# Проверка зависимостей при старте
+if not check_dependencies():
+    # Если библиотек нет, даем пользователю шанс всё же продолжить (на свой страх и риск) 
+    # или просто закрываемся. Здесь просто вывели ошибку, но дадим зайти в меню.
+    pass
 
 tk.Label(root, text="Универсальное меню ЦОСиИ", font=("Arial", 14, "bold"), fg="white", bg="#2c3e50", pady=20).pack()
 
