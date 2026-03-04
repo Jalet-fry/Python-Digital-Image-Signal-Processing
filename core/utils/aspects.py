@@ -17,9 +17,7 @@ def log_dsp_action(func):
         try:
             result = func(*args, **kwargs)
             
-            # Логируем только внешний вызов (чтобы не тормозить на рекурсии)
             if DSPContext._call_depth == 1:
-                # Путь: PythonDSP/results/debug_logs/var_X/labY/
                 log_dir = os.path.join(BASE_DIR, "results", "debug_logs", f"var_{DSPContext.variant}", DSPContext.current_lab)
                 
                 if not os.path.exists(log_dir):
@@ -27,17 +25,14 @@ def log_dsp_action(func):
                 
                 file_path = os.path.join(log_dir, f"{func.__name__}_output.txt")
                 
-                # Сохраняем результат
-                if isinstance(result, np.ndarray) and result.size < 15000:
+                # УВЕЛИЧИЛИ ЛИМИТ ДО 100 000 ТОЧЕК
+                if isinstance(result, np.ndarray) and result.size < 100000:
                     with open(file_path, "w", encoding="utf-8") as f:
                         f.write(f"--- {func.__name__.upper()} DUMP ---\n")
                         f.write(f"Variant: {DSPContext.variant}\n")
                         f.write(f"Shape: {result.shape}\n\n")
                         np.set_printoptions(threshold=np.inf, precision=6, suppress=True)
                         f.write(np.array2string(result))
-                    
-                    # Подтверждение в консоль (для спокойствия)
-                    # print(f"  [LOG] Data saved to debug_logs/{func.__name__}_output.txt")
             
             return result
         finally:

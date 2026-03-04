@@ -15,12 +15,9 @@ def generate_instrument_signal(amplitudes, f0, harmonics, phases, duration=0.02,
     for a, h in zip(amplitudes, harmonics):
         # f_current = f0 * h (Например: 110Гц, 220Гц, 330Гц...)
         
-        # a * np.sin(...) - это НЕ ОДНО ЧИСЛО. Это целый массив из 1024 новых точек.
         # Это "новая звуковая волна" конкретной гармоники.
         new_wave = a * np.sin(2 * np.pi * (f0 * h) * t + phases)
         
-        # ОПЕРАЦИЯ signal += new_wave:
-        # Она берет 1024 числа из signal и складывает их с 1024 числами из new_wave
         # ПАРАМИ: signal[0] + new_wave[0], signal[1] + new_wave[1]...
         #
         # ЧТО В ИТОГЕ:

@@ -1,5 +1,7 @@
 import numpy as np
+from core.utils.aspects import log_dsp_action
 
+@log_dsp_action
 def moving_average_recursive(x, M):
     """
     Рекурсивный однородный фильтр (Moving Average).
@@ -19,15 +21,12 @@ def fir_window_bandpass(f_low, f_high, M, sr=8000):
     КИХ-фильтр полосовой (Bandpass) методом окон.
     Использует окно Блэкмана (Blackman).
     """
-    # Нормированные частоты
     w_low = 2 * np.pi * f_low / sr
     w_high = 2 * np.pi * f_high / sr
     
     n = np.arange(M)
     center = (M - 1) / 2
     
-    # Идеальный полосовой фильтр (разность двух ФНЧ)
-    # h[n] = sin(w_high*(n-mid)) / (pi*(n-mid)) - sin(w_low*(n-mid)) / (pi*(n-mid))
     def sinc(w, n, mid):
         res = np.zeros_like(n, dtype=float)
         idx = (n != mid)
@@ -42,27 +41,25 @@ def fir_window_bandpass(f_low, f_high, M, sr=8000):
     
     return h * window
 
+@log_dsp_action
+def apply_iir(x, b, a):
+    """Применяет БИХ-фильтр через разностное уравнение."""
+    y = np.zeros_like(x)
+    for n in range(2, len(x)):
+        y[n] = b[0]*x[n] + b[1]*x[n-1] + b[2]*x[n-2] - a[1]*y[n-1] - a[2]*y[n-2]
+    return y
+
 def iir_bandpass(f0, bw, sr=8000):
     """
     БИХ-фильтр полосовой (Резонансный биквадрат).
     f0 - центральная частота, bw - полоса пропускания.
-    Возвращает коэффициенты (a, b) для разностного уравнения.
     """
     omega = 2 * np.pi * f0 / sr
     sn = np.sin(omega)
     cs = np.cos(omega)
-    # Коэффициент затухания (Q-factor связан с BW)
     alpha = sn * np.sinh(np.log(2)/2 * bw * omega / sn)
     
     b = [alpha, 0, -alpha]
     a = [1 + alpha, -2 * cs, 1 - alpha]
     
-    # Нормировка по a0
     return np.array(b) / a[0], np.array(a) / a[0]
-
-def apply_iir(x, b, a):
-    """Применяет БИХ-фильтр через разностное уравнение."""
-    y = np.zeros_like(x)
-    for n in range(len(x)):
-        y[n] = b[0]*x[n] + b[1]*x[n-1] + b[2]*x[n-2] - a[1]*y[n-1] - a[2]*y[n-2]
-    return y
