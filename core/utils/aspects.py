@@ -17,6 +17,7 @@ def log_dsp_action(func):
         try:
             result = func(*args, **kwargs)
             
+            # Логируем только вызовы верхнего уровня, чтобы не захламлять лог рекурсией
             if DSPContext._call_depth == 1:
                 log_dir = os.path.join(BASE_DIR, "results", "debug_logs", f"var_{DSPContext.variant}", DSPContext.current_lab)
                 
@@ -25,14 +26,22 @@ def log_dsp_action(func):
                 
                 file_path = os.path.join(log_dir, f"{func.__name__}_output.txt")
                 
-                # УВЕЛИЧИЛИ ЛИМИТ ДО 100 000 ТОЧЕК
-                if isinstance(result, np.ndarray) and result.size < 100000:
-                    with open(file_path, "w", encoding="utf-8") as f:
-                        f.write(f"--- {func.__name__.upper()} DUMP ---\n")
-                        f.write(f"Variant: {DSPContext.variant}\n")
-                        f.write(f"Shape: {result.shape}\n\n")
-                        np.set_printoptions(threshold=np.inf, precision=6, suppress=True)
-                        f.write(np.array2string(result))
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(f"--- {func.__name__.upper()} DUMP ---\n")
+                    f.write(f"Variant: {DSPContext.variant}\n")
+
+                    def format_val(val):
+                        if isinstance(val, np.ndarray):
+                            np.set_printoptions(threshold=1000, precision=6, suppress=True)
+                            return f"Array {val.shape}:\n{np.array2string(val)}"
+                        return str(val)
+
+                    if isinstance(result, tuple):
+                        f.write(f"Returned {len(result)} values:\n")
+                        for i, res in enumerate(result):
+                            f.write(f"[{i}]: {format_val(res)}\n\n")
+                    else:
+                        f.write(f"Result: {format_val(result)}\n")
             
             return result
         finally:

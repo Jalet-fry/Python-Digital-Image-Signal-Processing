@@ -2,7 +2,6 @@ import numpy as np
 try:
     from numba import njit
 except ImportError:
-    # Заглушка, если Numba не установлена
     def njit(func): return func
 
 from core.utils.aspects import log_dsp_action
@@ -25,10 +24,7 @@ def moving_average_recursive(x, M):
 @log_dsp_action
 @njit
 def fir_manual_filter(x, h):
-    """
-    Программная реализация КИХ-фильтрации (стр. 39, формула 35).
-    ИСПРАВЛЕНО: цикл с 0 и проверка индекса.
-    """
+    """ Программная реализация КИХ-фильтрации (стр. 39, формула 35). """
     N, M = len(x), len(h)
     y = np.zeros(N)
     for i in range(N):
@@ -39,24 +35,37 @@ def fir_manual_filter(x, h):
         y[i] = s
     return y
 
-def fir_window_bandpass(f_low, f_high, M, sr=8000):
-    """ Проектирование КИХ методом взвешивания (стр. 40). """
-    w_l, w_h = 2 * np.pi * f_low / sr, 2 * np.pi * f_high / sr
-    n = np.arange(M); center = (M - 1) / 2
-    def sinc(w, n, mid):
+@log_dsp_action
+def fir_window_design(f_low, f_high, M, sr=8000, window_type='blackman'):
+    """ Проектирование КИХ-фильтра методом взвешивания (стр. 40). """
+    w_l = 2 * np.pi * f_low / sr
+    w_h = 2 * np.pi * f_high / sr
+    n = np.arange(M)
+    center = (M - 1) / 2
+
+    def sinc_ideal(w, n, mid):
         res = np.zeros_like(n, dtype=float)
         idx = (n != mid)
         res[idx] = np.sin(w * (n[idx] - mid)) / (np.pi * (n[idx] - mid))
         res[~idx] = w / np.pi
         return res
-    h_d = sinc(w_h, n, center) - sinc(w_l, n, center)
-    w_n = 0.42 - 0.5*np.cos(2*np.pi*n/(M-1)) + 0.08*np.cos(4*np.pi*n/(M-1))
+
+    h_d = sinc_ideal(w_h, n, center) - sinc_ideal(w_l, n, center)
+
+    if window_type == 'blackman':
+        w_n = 0.42 - 0.5 * np.cos(2 * np.pi * n / (M - 1)) + 0.08 * np.cos(4 * np.pi * n / (M - 1))
+    elif window_type == 'hamming':
+        w_n = 0.54 - 0.46 * np.cos(2 * np.pi * n / (M - 1))
+    else:
+        w_n = np.ones(M)
+
     return h_d * w_n
 
+@log_dsp_action
 def iir_design(params, sr=8000):
-    """ Расчет коэффициентов БИХ (стр. 41-43). b - вход (x), a - выход (y). """
+    """ Расчет коэффициентов БИХ (стр. 41-43). """
     m_type = params.get('type')
-    b, a = np.zeros(3), np.ones(3) # a0 = 1
+    b, a = np.zeros(3), np.ones(3)
     if m_type == 'lpf':
         x_val = np.exp(-2 * np.pi * params['fc'] / sr)
         b[0] = 1 - x_val; a[1] = -x_val; a[2] = 0
@@ -78,30 +87,25 @@ def iir_design(params, sr=8000):
 @log_dsp_action
 @njit
 def apply_iir(x, b, a):
-    """
-    Разностное уравнение (стр. 41) с безопасной проверкой индексов
-    и нормировкой Gain (стр. 48)."""
+    """ Реализация БИХ-фильтра через разностное уравнение (стр. 41). """
     y = np.zeros_like(x)
-
-    # Считаем Gain по методичке (сумма b / сумма a)
-    sum_b = np.sum(b)
-    sum_a = np.sum(a)
-    gain = sum_b / (sum_a + 1e-12)
-
-    # Проходим циклом, проверяя наличие коэффициентов
-    for n in range(2, len(x)):
-        # Входящая часть (b)
+    for n in range(len(x)):
         out = b[0] * x[n]
-        if len(b) > 1: out += b[1] * x[n-1]
-        if len(b) > 2: out += b[2] * x[n-2]
-
-        # Рекурсивная часть (a) - вычитаем обратную связь
-        out -= (a[1] * y[n-1] + a[2] * y[n-2])
+        if n >= 1:
+            out += b[1] * x[n-1]
+            out -= a[1] * y[n-1]
+        if n >= 2:
+            out += b[2] * x[n-2]
+            out -= a[2] * y[n-2]
         y[n] = out
 
-    # Финальная нормировка по методичке
-    if abs(gain) > 1e-6:
-        return y / gain
+    # Нормировка усиления (Step 7, стр. 48) - только для LPF/HPF
+    sum_b = np.sum(b)
+    sum_a = np.sum(a)
+    if abs(sum_b) > 1e-5:
+        gain = sum_b / (sum_a + 1e-12)
+        if abs(gain) > 1e-6:
+            return y / gain
     return y
 
 def iir_bandpass(f0, bw, sr=8000):

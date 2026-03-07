@@ -1,5 +1,7 @@
 import numpy as np
+from core.utils.aspects import log_dsp_action
 
+@log_dsp_action
 def generate_instrument_signal(amplitudes, f0, harmonics, phases, duration=0.02, sr=10000):
     """
     Генерирует сложный сигнал инструмента (Виолончель/Контрабас) методом аддитивного синтеза.
