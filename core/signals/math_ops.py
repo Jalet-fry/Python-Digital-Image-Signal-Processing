@@ -1,8 +1,10 @@
 import numpy as np
+from numba import njit
 from core.signals.fourier import fft, ifft
 from core.utils.aspects import log_dsp_action
 
 @log_dsp_action
+@njit
 def linear_convolution(x, y):
     """
     Классическая линейная свертка (через циклы).
@@ -45,6 +47,7 @@ def fft_convolution(x, y):
     return result.real[:Nz]
 
 @log_dsp_action
+@njit
 def correlation(x, y):
     """
     Взаимная корреляция (через циклы).
