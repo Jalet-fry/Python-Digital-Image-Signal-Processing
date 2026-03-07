@@ -149,7 +149,7 @@ def update_plots(label):
         main_axes[0].grid(True, alpha=0.3, linestyle='--')
 
         f, m_db = get_spectrum(sig, ref_peak=ref_peak)
-        main_axes[1].fill_between(f, m_db, color=col, alpha=0.5)
+        main_axes[1].fill_between(f, -60, m_db, color=col, alpha=0.5)
         for freq_h in [110, 220, 330, 440]:
             main_axes[1].axvline(x=freq_h, color='red', linestyle='--', alpha=0.5, label=f'{freq_h} Гц' if freq_h == 110 else '')
         main_axes[1].set_title("Спектр чистого сигнала (дБ)", fontweight='bold'); main_axes[1].set_xlim(0, 2500); main_axes[1].set_ylim(-60, 5)
@@ -167,7 +167,7 @@ def update_plots(label):
         main_axes[0].set_xlabel("Время, мс"); main_axes[0].set_ylabel("Амплитуда"); main_axes[0].grid(True, alpha=0.3)
 
         f, m_db = get_spectrum(sig, ref_peak=ref_peak)
-        main_axes[1].fill_between(f, m_db, color=col, alpha=0.5)
+        main_axes[1].fill_between(f, -60, m_db, color=col, alpha=0.5)
         main_axes[1].axvline(x=1500, color='red', linestyle='--', alpha=0.7, label='Помеха 1500 Гц')
         main_axes[1].set_title("Спектр шума (дБ)", fontweight='bold'); main_axes[1].set_xlim(0, 2500); main_axes[1].set_ylim(-60, 5)
         main_axes[1].set_xlabel("Частота, Гц"); main_axes[1].set_ylabel("Магнитуда, дБ")
@@ -183,7 +183,7 @@ def update_plots(label):
         main_axes[0].set_xlabel("Время, мс"); main_axes[0].set_ylabel("Амплитуда"); main_axes[0].grid(True, alpha=0.3)
 
         f, m_db = get_spectrum(sig, ref_peak=ref_peak)
-        main_axes[1].fill_between(f, m_db, color=col, alpha=0.5)
+        main_axes[1].fill_between(f, -60, m_db, color=col, alpha=0.5)
         main_axes[1].set_title("Спектр зашумленного сигнала (дБ)", fontweight='bold'); main_axes[1].set_xlim(0, 2500); main_axes[1].set_ylim(-60, 5)
         main_axes[1].set_xlabel("Частота, Гц"); main_axes[1].set_ylabel("Магнитуда, дБ"); main_axes[1].grid(True, alpha=0.3)
 
@@ -228,7 +228,7 @@ def update_plots(label):
 
         f_in, m_in_db = get_spectrum(x_noisy, ref_peak=ref_peak)
         f_out, m_out_db = get_spectrum(sig, ref_peak=ref_peak)
-        main_axes[1].fill_between(f_in, m_in_db, color='orange', alpha=0.2, label='ДО')
+        main_axes[1].fill_between(f_in, -60, m_in_db, color='orange', alpha=0.2, label='ДО')
         main_axes[1].plot(f_out, m_out_db, color=col, lw=1.5, label='ПОСЛЕ')
         main_axes[1].set_title("Спектральная очистка (дБ)", fontweight='bold'); main_axes[1].set_xlim(0, 2500); main_axes[1].set_ylim(-60, 5)
         main_axes[1].set_xlabel("Частота, Гц"); main_axes[1].set_ylabel("Магнитуда, дБ")
