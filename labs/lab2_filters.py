@@ -116,17 +116,19 @@ plt.subplots_adjust(left=0.28, right=0.96, top=0.94, bottom=0.08, hspace=0.45)
 current_cursor = None
 
 @log_dsp_action
-def get_spectrum(sig, n=None):
+def get_spectrum(sig, n=None, ref_peak=None):
     if n is None: n = len(sig)
     window = np.hanning(n)
     spectrum = np.fft.fft(sig[:n] * window)
     mag = np.abs(spectrum)[:n//2]
     freqs = np.fft.fftfreq(n, 1/sr)[:n//2]
+    if ref_peak is not None:
+        return freqs, 20 * np.log10(mag/ref_peak + 1e-12)
     return freqs, mag
 
-# Референсный пик для нормализации (по зашумленному сигналу)
-_, m_ref_init = get_spectrum(x_noisy)
-ref_peak = np.max(m_ref_init) if np.max(m_ref_init) > 1e-12 else 1.0
+# Референсный пик (по зашумленному сигналу)
+_, m_lin = get_spectrum(x_noisy, ref_peak=None)
+ref_peak = np.max(m_lin) if np.max(m_lin) > 1e-12 else 1.0
 
 def update_plots(label):
     global current_cursor
@@ -146,12 +148,12 @@ def update_plots(label):
         main_axes[0].set_xlabel("Время, мс"); main_axes[0].set_ylabel("Амплитуда")
         main_axes[0].grid(True, alpha=0.3, linestyle='--')
 
-        f, m = get_spectrum(sig)
-        main_axes[1].fill_between(f, m/ref_peak, color=col, alpha=0.5)
+        f, m_db = get_spectrum(sig, ref_peak=ref_peak)
+        main_axes[1].fill_between(f, m_db, color=col, alpha=0.5)
         for freq_h in [110, 220, 330, 440]:
             main_axes[1].axvline(x=freq_h, color='red', linestyle='--', alpha=0.5, label=f'{freq_h} Гц' if freq_h == 110 else '')
-        main_axes[1].set_title("Спектр чистого сигнала (Нормировано)", fontweight='bold'); main_axes[1].set_xlim(0, 2500)
-        main_axes[1].set_xlabel("Частота, Гц"); main_axes[1].set_ylabel("Магнитуда")
+        main_axes[1].set_title("Спектр чистого сигнала (дБ)", fontweight='bold'); main_axes[1].set_xlim(0, 2500); main_axes[1].set_ylim(-60, 5)
+        main_axes[1].set_xlabel("Частота, Гц"); main_axes[1].set_ylabel("Магнитуда, дБ")
         main_axes[1].legend(loc='upper right', fontsize=8); main_axes[1].grid(True, alpha=0.3, linestyle='--')
 
         main_axes[2].hist(sig, bins=70, color=col, alpha=0.7, edgecolor='black', lw=0.5)
@@ -162,14 +164,14 @@ def update_plots(label):
         sig, col = total_noise, "#7f8c8d"
         main_axes[0].plot(t_axis[:N_pts]*1000, sig[:N_pts], color=col, linewidth=1)
         main_axes[0].set_title("Шум (белый + наводка 1500 Гц)", fontweight='bold')
-        main_axes[0].set_xlabel("Время, мс"); main_axes[0].set_ylabel("Амплитуда")
-        main_axes[0].grid(True, alpha=0.3, linestyle='--')
+        main_axes[0].set_xlabel("Время, мс"); main_axes[0].set_ylabel("Амплитуда"); main_axes[0].grid(True, alpha=0.3)
 
-        f, m = get_spectrum(sig)
-        main_axes[1].fill_between(f, m/ref_peak, color=col, alpha=0.5)
+        f, m_db = get_spectrum(sig, ref_peak=ref_peak)
+        main_axes[1].fill_between(f, m_db, color=col, alpha=0.5)
         main_axes[1].axvline(x=1500, color='red', linestyle='--', alpha=0.7, label='Помеха 1500 Гц')
-        main_axes[1].set_title("Спектр шума", fontweight='bold'); main_axes[1].set_xlim(0, 2500)
-        main_axes[1].legend(loc='upper right', fontsize=9); main_axes[1].grid(True, alpha=0.3, linestyle='--')
+        main_axes[1].set_title("Спектр шума (дБ)", fontweight='bold'); main_axes[1].set_xlim(0, 2500); main_axes[1].set_ylim(-60, 5)
+        main_axes[1].set_xlabel("Частота, Гц"); main_axes[1].set_ylabel("Магнитуда, дБ")
+        main_axes[1].legend(loc='upper right', fontsize=9); main_axes[1].grid(True, alpha=0.3)
 
         main_axes[2].hist(sig, bins=70, color=col, alpha=0.7, edgecolor='black', lw=0.5)
         main_axes[2].set_title("Гистограмма шума", fontweight='bold'); main_axes[2].grid(True, alpha=0.3)
@@ -178,15 +180,12 @@ def update_plots(label):
         sig, col, snr = x_noisy, "#e67e22", data["snr"]
         main_axes[0].plot(t_axis[:N_pts]*1000, sig[:N_pts], color=col, linewidth=1.5)
         main_axes[0].set_title(f"Зашумленный сигнал (SNR = {snr:.2f} dB)", fontweight='bold')
-        main_axes[0].set_xlabel("Время, мс"); main_axes[0].set_ylabel("Амплитуда")
-        main_axes[0].grid(True, alpha=0.3, linestyle='--')
+        main_axes[0].set_xlabel("Время, мс"); main_axes[0].set_ylabel("Амплитуда"); main_axes[0].grid(True, alpha=0.3)
 
-        f, m = get_spectrum(sig)
-        main_axes[1].fill_between(f, m/ref_peak, color=col, alpha=0.5)
-        for freq_h in [110, 220, 330, 440, 1500]:
-            main_axes[1].axvline(x=freq_h, color='red', linestyle='--', alpha=0.3)
-        main_axes[1].set_title("Спектр зашумленного сигнала", fontweight='bold'); main_axes[1].set_xlim(0, 2500)
-        main_axes[1].grid(True, alpha=0.3, linestyle='--')
+        f, m_db = get_spectrum(sig, ref_peak=ref_peak)
+        main_axes[1].fill_between(f, m_db, color=col, alpha=0.5)
+        main_axes[1].set_title("Спектр зашумленного сигнала (дБ)", fontweight='bold'); main_axes[1].set_xlim(0, 2500); main_axes[1].set_ylim(-60, 5)
+        main_axes[1].set_xlabel("Частота, Гц"); main_axes[1].set_ylabel("Магнитуда, дБ"); main_axes[1].grid(True, alpha=0.3)
 
         main_axes[2].hist(sig, bins=70, color=col, alpha=0.7, edgecolor='black', lw=0.5)
         main_axes[2].grid(True, alpha=0.3)
@@ -201,11 +200,12 @@ def update_plots(label):
         snr_info = f"Сравнение SNR:\nMA: {data_map['5. Фильтр MA (рекурсивный)']['snr']:.1f} dB\nFIR: {data_map['6. КИХ-фильтр (Blackman)']['snr']:.1f} dB\nIIR: {data_map['7. БИХ-фильтр (резонансный)']['snr']:.1f} dB"
         main_axes[0].text(0.02, 0.98, snr_info, transform=main_axes[0].transAxes, va='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
 
-        f_c, m_c = get_spectrum(x_clean); f_n, m_n = get_spectrum(x_noisy)
-        main_axes[1].plot(f_c, m_c/ref_peak, color="#2980b9", label='Чистый')
-        main_axes[1].plot(f_n, m_n/ref_peak, color="#e67e22", alpha=0.6, label='Зашумленный')
-        main_axes[1].set_title("Сравнение спектров", fontweight='bold'); main_axes[1].set_xlim(0, 2500)
-        main_axes[1].set_xlabel("Частота, Гц"); main_axes[1].set_ylabel("Магнитуда")
+        f_c, m_c_db = get_spectrum(x_clean, ref_peak=ref_peak)
+        f_n, m_n_db = get_spectrum(x_noisy, ref_peak=ref_peak)
+        main_axes[1].plot(f_c, m_c_db, color="#2980b9", label='Чистый')
+        main_axes[1].plot(f_n, m_n_db, color="#e67e22", alpha=0.6, label='Зашумленный')
+        main_axes[1].set_title("Сравнение спектров (дБ)", fontweight='bold'); main_axes[1].set_xlim(0, 2500); main_axes[1].set_ylim(-60, 5)
+        main_axes[1].set_xlabel("Частота, Гц"); main_axes[1].set_ylabel("Магнитуда, дБ")
         main_axes[1].legend(loc='upper right', fontsize=7); main_axes[1].grid(True, alpha=0.3, linestyle='--')
 
         main_axes[2].hist(x_clean, bins=50, alpha=0.5, color='#2980b9', label='Чистый')
@@ -226,12 +226,13 @@ def update_plots(label):
         main_axes[0].set_xlabel("Время, мс"); main_axes[0].set_ylabel("Амплитуда")
         main_axes[0].legend(fontsize=8); main_axes[0].grid(True, alpha=0.3, linestyle='--')
 
-        f_in, m_in = get_spectrum(x_noisy); f_out, m_out = get_spectrum(sig)
-        main_axes[1].fill_between(f_in, m_in/ref_peak, color='orange', alpha=0.2, label='ДО')
-        main_axes[1].plot(f_out, m_out/ref_peak, color=col, lw=1.5, label='ПОСЛЕ')
-        main_axes[1].set_title("Спектральная очистка (Нормировано)", fontweight='bold'); main_axes[1].set_xlim(0, 2500)
-        main_axes[1].set_xlabel("Частота, Гц"); main_axes[1].set_ylabel("Магнитуда")
-        main_axes[1].legend(loc='upper right', fontsize=8); main_axes[1].grid(True, alpha=0.3, linestyle='--')
+        f_in, m_in_db = get_spectrum(x_noisy, ref_peak=ref_peak)
+        f_out, m_out_db = get_spectrum(sig, ref_peak=ref_peak)
+        main_axes[1].fill_between(f_in, m_in_db, color='orange', alpha=0.2, label='ДО')
+        main_axes[1].plot(f_out, m_out_db, color=col, lw=1.5, label='ПОСЛЕ')
+        main_axes[1].set_title("Спектральная очистка (дБ)", fontweight='bold'); main_axes[1].set_xlim(0, 2500); main_axes[1].set_ylim(-60, 5)
+        main_axes[1].set_xlabel("Частота, Гц"); main_axes[1].set_ylabel("Магнитуда, дБ")
+        main_axes[1].legend(loc='upper right', fontsize=8); main_axes[1].grid(True, alpha=0.3)
 
         # АЧХ: Линейная (слева) + дБ (справа)
         main_axes[2].plot(w, np.abs(h_resp), color='black', lw=2, label='АЧХ (лин)')
