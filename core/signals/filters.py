@@ -99,12 +99,12 @@ def apply_iir(x, b, a):
             out -= a[2] * y[n-2]
         y[n] = out
 
-    # Нормировка усиления (Step 7, стр. 48) - только для LPF/HPF
+    # Нормировка усиления (Step 7, стр. 48)
     sum_b = np.sum(b)
     sum_a = np.sum(a)
     if abs(sum_b) > 1e-5:
         gain = sum_b / (sum_a + 1e-12)
-        if abs(gain) > 1e-6:
+        if abs(gain) > 1e-6 and abs(gain - 1.0) > 1e-3:
             return y / gain
     return y
 
