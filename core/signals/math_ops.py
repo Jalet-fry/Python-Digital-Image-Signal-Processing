@@ -1,5 +1,9 @@
 import numpy as np
-from numba import njit
+try:
+    from numba import njit
+except ImportError:
+    def njit(func): return func
+
 from core.signals.fourier import fft, ifft
 from core.utils.aspects import log_dsp_action
 
@@ -7,84 +11,71 @@ from core.utils.aspects import log_dsp_action
 @njit
 def linear_convolution(x, y):
     """
-    Классическая линейная свертка (через циклы).
-    Именно так она описана в методичке на стр. 27.
+    Классическая линейная свертка (стр. 27).
+    Оптимизирована для Numba: убраны проверки if внутри циклов.
     """
     Nx, Ny = len(x), len(y)
-    Nz = Nx + Ny - 1 # Длина результата всегда N + M - 1
-    z = np.zeros(Nz)
+    Nz = Nx + Ny - 1
+    z = np.zeros(Nz, dtype=np.float64)
     
-    # Вложенные циклы: мы "протаскиваем" сигнал Y вдоль X
     for n in range(Nz):
-        for k in range(Nx):
-            # n - k - это индекс в сигнале Y (сдвинутый)
-            if 0 <= n - k < Ny:
-                z[n] += x[k] * y[n - k]
+        # Вычисляем границы k заранее, чтобы n-k всегда попадал в массив y
+        k_start = max(0, n - Ny + 1)
+        k_end = min(Nx, n + 1)
+        
+        s = 0.0
+        for k in range(k_start, k_end):
+            s += x[k] * y[n - k]
+        z[n] = s
     return z
 
 @log_dsp_action
 def fft_convolution(x, y):
-    """
-    БЫСТРАЯ СВЕРТКА (через Теорему о свертке, стр. 30).
-    Свертка во времени = Умножение в частотной области.
-    """
+    """ Быстрая свертка через БПФ (стр. 30). """
     Nx, Ny = len(x), len(y)
     Nz = Nx + Ny - 1
-    
-    # 1. PADDING (Дополнение нулями)
-    # Находим ближайшую степень двойки для БПФ
     n_fft = 1 << (Nz - 1).bit_length() 
     
-    # 2. ПЕРЕХОД В ЧАСТОТЫ
     X = fft(np.pad(x, (0, n_fft - Nx)))
     Y = fft(np.pad(y, (0, n_fft - Ny)))
     
-    # 3. УМНОЖЕНИЕ СПЕКТРОВ
-    # Каждая частота умножается на частоту
     result = ifft(X * Y)
-    
-    # Возвращаем вещественную часть (т.к. мнимая после IFFT близка к 0)
     return result.real[:Nz]
 
 @log_dsp_action
 @njit
 def correlation(x, y):
     """
-    Взаимная корреляция (через циклы).
-    Показывает степень сходства сигналов при разных сдвигах.
+    Взаимная корреляция (стр. 29). Оптимизирована для Numba.
     """
     Nx, Ny = len(x), len(y)
     Nz = Nx + Ny - 1
-    res = np.zeros(Nz)
+    res = np.zeros(Nz, dtype=np.float64)
     
-    # В отличие от свертки, здесь сигнал НЕ инвертируется (j = i - lag)
-    for lag in range(-(Ny - 1), Nx):
-        s = 0
-        for i in range(Nx):
-            j = i - lag
-            if 0 <= j < Ny:
-                s += x[i] * y[j]
-        res[lag + (Ny - 1)] = s
+    for lag_idx in range(Nz):
+        lag = lag_idx - (Ny - 1)
+        # i_start и i_end гарантируют, что индексы i и i-lag в пределах массивов
+        i_start = max(0, lag)
+        i_end = min(Nx, Ny + lag)
+        
+        s = 0.0
+        for i in range(i_start, i_end):
+            s += x[i] * y[i - lag]
+        res[lag_idx] = s
     return res
 
 @log_dsp_action
 def fft_correlation(x, y):
-    """
-    БЫСТРАЯ КОРРЕЛЯЦИЯ (Теорема корреляции, стр. 29).
-    Использует комплексно-сопряженный спектр одного из сигналов.
-    """
+    """ Быстрая корреляция через спектры (стр. 29). """
     Nx, Ny = len(x), len(y)
     Nz = Nx + Ny - 1
     n_fft = 1 << (Nz - 1).bit_length()
     
     X = fft(np.pad(x, (0, n_fft - Nx)))
-    # КЛЮЧЕВОЕ ОТЛИЧИЕ ОТ СВЕРТКИ: np.conjugate(Y)
     Y = fft(np.pad(y, (0, n_fft - Ny)))
     
-    # Теорема корреляции: Z = X * conj(Y)
     raw_corr = ifft(X * np.conjugate(Y))
     
-    # Центрируем результат (сдвигаем отрицательные лаги в начало)
     pos_lags = raw_corr[:Nx]
     neg_lags = raw_corr[n_fft - (Ny - 1):]
     return np.concatenate([neg_lags, pos_lags]).real

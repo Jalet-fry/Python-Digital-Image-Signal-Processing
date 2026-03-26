@@ -1,5 +1,9 @@
 numpy
 matplotlib
 scipy
+librosa
+sounddevice
 mplcursors
-numba
+pesq
+pystoi
+deepfilternet
