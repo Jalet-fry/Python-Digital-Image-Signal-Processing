@@ -14,6 +14,7 @@ class InstrumentParams:
 class Lab1Config:
     x: InstrumentParams
     y: InstrumentParams
+    variant: int = 10
     N: int = 1024
     sr: int = 8000
     sr_audio: int = 44100

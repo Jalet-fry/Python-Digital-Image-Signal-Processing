@@ -1,75 +1,49 @@
-import tkinter as tk
-from tkinter import messagebox
-import os
 import sys
+import os
 import subprocess
-import threading
-import importlib
+import matplotlib.pyplot as plt
+from matplotlib.widgets import Button
+from core.utils.themes import UIColors
 
-# Константа варианта - теперь фиксированная
-DEFAULT_VARIANT = "10"
+# Словарь для отслеживания активных процессов
+active_processes = {}
 
-def check_dependencies():
-    required = ["numpy", "matplotlib", "scipy", "mplcursors", "sounddevice"]
-    missing = []
-    for lib in required:
-        try:
-            importlib.import_module(lib)
-        except ImportError:
-            missing.append(lib)
-    return missing
-
-def run_lab(lab_name):
-    script_path = os.path.join(os.path.dirname(__file__), "labs", f"{lab_name}.py")
+def run_lab(name, script):
+    # Проверяем, не запущен ли уже этот процесс
+    if name in active_processes:
+        if active_processes[name].poll() is None:
+            print(f">>> [UI] Лабораторная {name} уже запущена.")
+            return
     
-    # Проверка существования файла (для ЛР3, которую скоро создадим)
-    if not os.path.exists(script_path):
-        messagebox.showinfo("В разработке", f"Файл {lab_name}.py еще не создан. Начинаем реализацию!")
-        return
+    print(f">>> [UI] Запуск {name}...")
+    active_processes[name] = subprocess.Popen([sys.executable, script])
 
-    # Скрываем главное меню
-    root.withdraw()
+def show_menu():
+    UIColors.apply_style()
+    fig = plt.figure(figsize=(8, 6))
+    fig.canvas.manager.set_window_title('BSUIR DSP Manager')
+    
+    plt.text(0.5, 0.85, "DSP STATION", fontsize=20, ha='center', color=UIColors.TEXT_ACCENT, weight='bold')
+    plt.text(0.5, 0.78, "Выберите лабораторную работу ",
+             fontsize=10, ha='center', color=UIColors.TEXT_DIM)
+    
+    # Лаб 1
+    ax1 = plt.axes([0.2, 0.6, 0.6, 0.08])
+    btn1 = Button(ax1, 'ЛАБ №1: Инструменты', color=UIColors.LAB1['x'], hovercolor=UIColors.TEXT_ACCENT)
+    btn1.on_clicked(lambda x: run_lab("Lab1", "labs/lab1_instruments.py"))
+    
+    # Лаб 2
+    ax2 = plt.axes([0.2, 0.48, 0.6, 0.08])
+    btn2 = Button(ax2, 'ЛАБ №2: Фильтрация', color=UIColors.LAB2['ma'], hovercolor=UIColors.TEXT_ACCENT)
+    btn2.on_clicked(lambda x: run_lab("Lab2", "labs/lab2_filters.py"))
+    
+    # Лаб 3
+    ax3 = plt.axes([0.2, 0.36, 0.6, 0.08])
+    btn3 = Button(ax3, 'ЛАБ №3: Речь', color=UIColors.LAB3['metrics'], hovercolor=UIColors.TEXT_ACCENT)
+    btn3.on_clicked(lambda x: run_lab("Lab3", "labs/lab3_speech.py"))
 
-    def monitor_process():
-        # Запускаем с фиксированным вариантом 10
-        process = subprocess.Popen([sys.executable, script_path, "--variant", DEFAULT_VARIANT])
-        process.wait()
-        # Возвращаем меню
-        root.after(0, root.deiconify)
+    fig.buttons = [btn1, btn2, btn3]
+    plt.show()
 
-    threading.Thread(target=monitor_process, daemon=True).start()
-
-root = tk.Tk()
-root.title("DSP Station")
-root.geometry("400x420")
-root.configure(bg="#2c3e50")
-root.resizable(False, False)
-
-# Заголовок
-tk.Label(root, text="DSP STATION v2.0", font=("Verdana", 16, "bold"), fg="#ecf0f1", bg="#2c3e50", pady=20).pack()
-tk.Label(root, text=f"ТЕКУЩИЙ ВАРИАНТ: {DEFAULT_VARIANT}", font=("Arial", 10, "bold"), fg="#f1c40f", bg="#2c3e50").pack()
-
-# Кнопки
-btn_style = {"font": ("Arial", 11, "bold"), "width": 30, "height": 2, "cursor": "hand2", "bd": 0}
-
-tk.Button(root, text="ЛАБОРАТОРНАЯ №1\n(Синтез и Фурье)", 
-          command=lambda: run_lab("lab1_instruments"), bg="#3498db", fg="white", **btn_style).pack(pady=10)
-
-tk.Button(root, text="ЛАБОРАТОРНАЯ №2\n(Цифровая фильтрация)", 
-          command=lambda: run_lab("lab2_filters"), bg="#27ae60", fg="white", **btn_style).pack(pady=10)
-
-tk.Button(root, text="ЛАБОРАТОРНАЯ №3\n(Анализ речи и DeepFilter)", 
-          command=lambda: run_lab("lab3_speech"), bg="#e67e22", fg="white", **btn_style).pack(pady=10)
-
-# Проверка зависимостей
-missing = check_dependencies()
-if missing:
-    status_msg = f"⚠ Внимание! Отсутствуют: {', '.join(missing)}"
-    status_col = "#e74c3c"
-else:
-    status_msg = "✔ Все зависимости установлены"
-    status_col = "#2ecc71"
-
-tk.Label(root, text=status_msg, font=("Arial", 9), fg=status_col, bg="#2c3e50", pady=10).pack(side="bottom")
-
-root.mainloop()
+if __name__ == "__main__":
+    show_menu()

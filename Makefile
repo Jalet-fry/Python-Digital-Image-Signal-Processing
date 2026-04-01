@@ -1,53 +1,41 @@
-# Настройки
+# ==========================================================
+# DSP Project Makefile - Unified Entry Point
+# ==========================================================
 PYTHON    = python
 VARIANT   = 10
-REQ_FILE  = requirements.txt
-DEP_STAMP = .deps_checked
 
-# Цвета (ANSI)
-CYAN   = \033[0;36m
-YELLOW = \033[1;33m
-GREEN  = \033[0;32m
-RED    = \033[0;31m
-NC     = \033[0m
+.PHONY: all lab1 lab2 lab3 clean install convert help
 
-.PHONY: all lab1 lab2 lab3 convert clean install setup header
-
-all: setup header
+# По умолчанию запускаем общее меню
+all:
 	@$(PYTHON) main.py
 
-# Запуск Лаб
-lab1: header
+help:
+	@echo "Доступные команды:"
+	@echo "  make         - Запуск общего меню выбора лаб"
+	@echo "  make lab1    - Быстрый запуск Лабораторной №1"
+	@echo "  make lab2    - Быстрый запуск Лабораторной №2"
+	@echo "  make lab3    - Быстрый запуск Лабораторной №3"
+	@echo "  make clean   - Очистка проекта (удаление core/signals и кэша)"
+	@echo "  make install - Установка библиотек"
+
+lab1:
 	@$(PYTHON) labs/lab1_instruments.py --variant $(VARIANT)
 
-lab2: header
+lab2:
 	@$(PYTHON) labs/lab2_filters.py --variant $(VARIANT)
 
-lab3: header
+lab3:
 	@$(PYTHON) labs/lab3_speech.py --variant $(VARIANT)
 
-# Команда для конвертации аудио (Лаба 3)
-convert: header
-	@$(PYTHON) -c "print('$(YELLOW)>>> Запуск конвертера аудио (WAV 16kHz Mono)...$(NC)')"
+convert:
 	@$(PYTHON) labs/convert_audio.py
-	@$(PYTHON) -c "print('$(GREEN)>>> [OK] Конвертация завершена.$(NC)')"
 
-# Установка зависимостей
 install:
-	@$(PYTHON) -c "print('$(YELLOW)>>> Установка библиотек (фиксация версий для DeepFilterNet)...$(NC)')"
-	$(PYTHON) -m pip install -r $(REQ_FILE) --force-reinstall
-	@$(PYTHON) -c "from pathlib import Path; Path('$(DEP_STAMP)').touch()"
-	@$(PYTHON) -c "print('$(GREEN)[OK] Все библиотеки установлены.$(NC)')"
-
-setup:
-	@$(PYTHON) -c "import importlib.util; libs=['torch', 'torchaudio', 'numpy', 'matplotlib', 'scipy', 'librosa', 'sounddevice', 'pydub', 'df']; \
-	missing=[l for l in libs if importlib.util.find_spec(l) is None]; \
-	print('$(GREEN)>>> [OK] Все зависимости найдены.$(NC)') if not missing else print('$(RED)>>> [!] Отсутствуют библиотеки: ' + ', '.join(missing) + '. \n>>> Запустите: make install$(NC)')"
-
-header:
-	@$(PYTHON) -c "print('$(CYAN)>>> DSP STATION (Вариант $(VARIANT)) | Project Manager$(NC)')"
+	@$(PYTHON) -m pip install -r requirements.txt
 
 clean:
-	@$(PYTHON) -c "print('$(YELLOW)Очистка временных файлов и логов...$(NC)')"
-	@$(PYTHON) -c "import shutil, os; [shutil.rmtree(os.path.join('results', d), ignore_errors=True) for d in ['debug_logs', 'logs/lab3', 'audio/lab3/processed', 'audio/lab3/noisy']]"
-	@$(PYTHON) -c "print('$(GREEN)Готово.$(NC)')"
+	@echo "Очистка проекта от старой архитектуры и мусора..."
+	@cmd /c cleanup_old_files.bat
+	@$(PYTHON) -c "import shutil, os; shutil.rmtree('results/debug_logs', ignore_errors=True)"
+	@echo "Готово."
