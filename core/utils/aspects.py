@@ -2,7 +2,7 @@ import os
 import numpy as np
 import functools
 
-# Определяем корень проекта для логов
+# Корень проекта для сохранения дампов
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 class DSPContext:
@@ -11,24 +11,26 @@ class DSPContext:
     _call_depth = 0
 
 def log_dsp_action(func):
+    """
+    Аспект для логирования действий ЦОС. 
+    Сохраняет результаты вычислений (массивы) в текстовые файлы для отладки.
+    """
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         DSPContext._call_depth += 1
         try:
             result = func(*args, **kwargs)
             
-            # Логируем только вызовы верхнего уровня, чтобы не захламлять лог рекурсией
+            # Логируем только вызовы верхнего уровня (чтобы не забить лог рекурсией FFT)
             if DSPContext._call_depth == 1:
                 log_dir = os.path.join(BASE_DIR, "results", "debug_logs", f"var_{DSPContext.variant}", DSPContext.current_lab)
-                
-                if not os.path.exists(log_dir):
-                    os.makedirs(log_dir, exist_ok=True)
+                os.makedirs(log_dir, exist_ok=True)
                 
                 file_path = os.path.join(log_dir, f"{func.__name__}_output.txt")
                 
                 with open(file_path, "w", encoding="utf-8") as f:
                     f.write(f"--- {func.__name__.upper()} DUMP ---\n")
-                    f.write(f"Variant: {DSPContext.variant}\n")
+                    f.write(f"Variant: {DSPContext.variant}\n\n")
 
                     def format_val(val):
                         if isinstance(val, np.ndarray):

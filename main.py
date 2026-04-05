@@ -1,48 +1,49 @@
 import sys
 import os
-import subprocess
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Button
 from core.utils.themes import UIColors
 
-# Словарь для отслеживания активных процессов
-active_processes = {}
-
-def run_lab(name, script):
-    # Проверяем, не запущен ли уже этот процесс
-    if name in active_processes:
-        if active_processes[name].poll() is None:
-            print(f">>> [UI] Лабораторная {name} уже запущена.")
-            return
-    
-    print(f">>> [UI] Запуск {name}...")
-    active_processes[name] = subprocess.Popen([sys.executable, script])
+# Импортируем функции main из лаб (с переименованием)
+from labs.lab1_instruments import main as run_lab1
+# Лаб 2 и 3 импортируем только при вызове, чтобы не грузить torch сразу
 
 def show_menu():
     UIColors.apply_style()
-    fig = plt.figure(figsize=(8, 6))
-    fig.canvas.manager.set_window_title('BSUIR DSP Manager')
+    fig = plt.figure(num='BSUIR DSP STATION', figsize=(10, 7))
+    fig.patch.set_facecolor(UIColors.BG_DARK)
     
-    plt.text(0.5, 0.85, "DSP STATION", fontsize=20, ha='center', color=UIColors.TEXT_ACCENT, weight='bold')
-    plt.text(0.5, 0.78, "Выберите лабораторную работу ",
-             fontsize=10, ha='center', color=UIColors.TEXT_DIM)
+    plt.text(0.5, 0.9, "ЦОСиИ: ЦИФРОВАЯ СТАНЦИЯ", fontsize=18, ha='center', color=UIColors.TEXT_ACCENT, weight='bold')
+    plt.text(0.5, 0.84, "Выберите лабораторную работу", fontsize=10, ha='center', color=UIColors.TEXT_MAIN)
     
     # Лаб 1
-    ax1 = plt.axes([0.2, 0.6, 0.6, 0.08])
-    btn1 = Button(ax1, 'ЛАБ №1: Инструменты', color=UIColors.LAB1['x'], hovercolor=UIColors.TEXT_ACCENT)
-    btn1.on_clicked(lambda x: run_lab("Lab1", "labs/lab1_instruments.py"))
+    ax1 = plt.axes([0.2, 0.65, 0.6, 0.1])
+    btn1 = Button(ax1, 'ЛАБОРАТОРНАЯ №1: СИНТЕЗ', color=UIColors.BTN_PLAY, hovercolor=UIColors.TEXT_ACCENT)
+    btn1.on_clicked(lambda x: run_lab1())
     
     # Лаб 2
-    ax2 = plt.axes([0.2, 0.48, 0.6, 0.08])
-    btn2 = Button(ax2, 'ЛАБ №2: Фильтрация', color=UIColors.LAB2['ma'], hovercolor=UIColors.TEXT_ACCENT)
-    btn2.on_clicked(lambda x: run_lab("Lab2", "labs/lab2_filters.py"))
+    ax2 = plt.axes([0.2, 0.52, 0.6, 0.1])
+    btn2 = Button(ax2, 'ЛАБОРАТОРНАЯ №2: ФИЛЬТРАЦИЯ', color=UIColors.BTN_RUN, hovercolor=UIColors.TEXT_ACCENT)
+    def call_lab2(event):
+        from labs.lab2_filters import main as run_lab2
+        run_lab2()
+    btn2.on_clicked(call_lab2)
     
     # Лаб 3
-    ax3 = plt.axes([0.2, 0.36, 0.6, 0.08])
-    btn3 = Button(ax3, 'ЛАБ №3: Речь', color=UIColors.LAB3['metrics'], hovercolor=UIColors.TEXT_ACCENT)
-    btn3.on_clicked(lambda x: run_lab("Lab3", "labs/lab3_speech.py"))
+    ax3 = plt.axes([0.2, 0.39, 0.6, 0.1])
+    btn3 = Button(ax3, 'ЛАБОРАТОРНАЯ №3: РЕЧЬ', color='#4C51BF', hovercolor=UIColors.TEXT_ACCENT)
+    def call_lab3(event):
+        from labs.lab3_speech import main as run_lab3
+        run_lab3()
+    btn3.on_clicked(call_lab3)
 
-    fig.buttons = [btn1, btn2, btn3]
+    # Выход
+    ax_exit = plt.axes([0.4, 0.15, 0.2, 0.06])
+    btn_exit = Button(ax_exit, 'ВЫХОД', color='#C53030', hovercolor='#9B2C2C')
+    btn_exit.on_clicked(lambda x: plt.close('all'))
+    btn_exit.label.set_color('white')
+
+    fig.buttons = [btn1, btn2, btn3, btn_exit]
     plt.show()
 
 if __name__ == "__main__":

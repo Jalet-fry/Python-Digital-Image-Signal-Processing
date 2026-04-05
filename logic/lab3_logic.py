@@ -1,8 +1,8 @@
 import numpy as np
 import librosa
-import torch
+import os
 from core.dsp.features import (
-    my_mel_spectrogram, get_mfcc_full, get_spectral_features,
+    my_mel_spectrogram, get_mfcc_full, get_extended_features,
     calc_snr_metric, calc_si_sdr, calc_pesq_manual
 )
 from core.dsp.generator import add_noise_snr, generate_white_noise
@@ -15,37 +15,36 @@ class SpeechProcessor:
         self.current_res = None
 
     def process_file(self, file_path, snr_db, use_df=True):
-        # 1. Загрузка
-        y, sr = librosa.load(file_path, sr=16000)
+        if not os.path.exists(file_path): return None
         
-        # 2. Зашумление
+        y, sr = librosa.load(file_path, sr=16000)
         noise = generate_white_noise(len(y))
         noisy, _ = add_noise_snr(y, noise, snr_db)
         
-        # 3. Очистка
         enhanced = self._enhance(noisy, sr, use_df)
         
-        # Выравнивание длин
         min_len = min(len(y), len(noisy), len(enhanced))
         y, noisy, enhanced = y[:min_len], noisy[:min_len], enhanced[:min_len]
 
-        # 4. Расчет признаков для UI
         mel_my = my_mel_spectrogram(y, sr)
-        mel_lib = librosa.power_to_db(librosa.feature.melspectrogram(y=y, sr=sr, n_mels=128))
-        
-        # MFCC (вектор для баров как в оригинале)
-        mfcc = get_mfcc_full(enhanced, sr)
-        
-        # Спектральные характеристики
-        spec_feats = get_spectral_features(enhanced, sr)
+        S_mel_lib = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=128)
+        mel_lib = librosa.power_to_db(S_mel_lib, ref=np.max)
+        S_stft = np.abs(librosa.stft(y))
+        stft_lib = librosa.amplitude_to_db(S_stft, ref=np.max)
+
+        mfcc = get_mfcc_full(y, sr)
+        ext_feats = get_extended_features(y, sr)
 
         self.current_res = {
             'clean': y, 'noisy': noisy, 'enhanced': enhanced, 'sr': sr,
             'features': {
                 'mel_my': mel_my,
                 'mel_lib': mel_lib,
+                'stft_lib': stft_lib,
                 'mfcc': mfcc,
-                **spec_feats
+                'spec_noisy': librosa.power_to_db(librosa.feature.melspectrogram(y=noisy, sr=sr), ref=np.max),
+                'spec_enh': librosa.power_to_db(librosa.feature.melspectrogram(y=enhanced, sr=sr), ref=np.max),
+                **ext_feats
             },
             'metrics': {
                 'snr_in': calc_snr_metric(y, noisy),
@@ -60,19 +59,24 @@ class SpeechProcessor:
     def _enhance(self, noisy, sr, use_df):
         if use_df and self.df_model:
             try:
+                import torch # Импорт внутри метода
                 from df.enhance import enhance
                 noisy_48 = librosa.resample(noisy, orig_sr=sr, target_sr=48000)
-                noisy_tensor = torch.from_numpy(noisy_48).float().unsqueeze(0).to(self.device)
-                with torch.no_grad():
-                    enhanced_tensor = enhance(self.df_model, self.df_state, noisy_tensor)
-                enhanced_48 = enhanced_tensor.cpu().numpy().squeeze()
+                
+                if isinstance(self.df_model, torch.nn.Module):
+                    noisy_t = torch.from_numpy(noisy_48).float().unsqueeze(0)
+                    with torch.no_grad():
+                        enhanced_t = enhance(self.df_model, self.df_state, noisy_t)
+                    enhanced_48 = enhanced_t.cpu().numpy().squeeze()
+                else:
+                    enhanced_48 = enhance(self.df_model, self.df_state, noisy_48)
+
                 return librosa.resample(enhanced_48, orig_sr=48000, target_sr=sr)
             except Exception as e:
-                print(f"DeepFilter Error: {e}")
+                print(f">>> [DF Error] {e}")
         
-        # Fallback: Спектральное вычитание
-        stft = librosa.stft(noisy)
-        mag, phase = librosa.magphase(stft)
-        noise_mag = np.mean(mag[:, :10], axis=1, keepdims=True)
-        mag_clean = np.maximum(mag - 1.5 * noise_mag, 0)
+        S = librosa.stft(noisy)
+        mag, phase = librosa.magphase(S)
+        noise_est = np.median(mag, axis=1, keepdims=True)
+        mag_clean = np.maximum(mag - 1.5 * noise_est, 0.0)
         return librosa.istft(mag_clean * phase)

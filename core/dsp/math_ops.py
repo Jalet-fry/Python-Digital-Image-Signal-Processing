@@ -1,36 +1,65 @@
 import numpy as np
+try:
+    from numba import njit
+except ImportError:
+    def njit(func): return func
+
 from core.dsp.fourier import fft, ifft
+from core.utils.aspects import log_dsp_action
 
-def linear_convolution(x, h):
-    N, M = len(x), len(h)
-    y = np.zeros(N + M - 1)
-    for i in range(N):
-        for j in range(M):
-            y[i + j] += x[i] * h[j]
-    return y
+@log_dsp_action
+@njit
+def linear_convolution(x, y):
+    """Классическая линейная свертка (NJIT-оптимизировано)."""
+    Nx, Ny = len(x), len(y)
+    Nz = Nx + Ny - 1
+    z = np.zeros(Nz, dtype=np.float64)
+    for n in range(Nz):
+        k_start = max(0, n - Ny + 1)
+        k_end = min(Nx, n + 1)
+        s = 0.0
+        for k in range(k_start, k_end):
+            s += x[k] * y[n - k]
+        z[n] = s
+    return z
 
-def fft_convolution(x, h):
-    N = len(x) + len(h) - 1
-    size = 1 << (N - 1).bit_length()
-    X = fft(np.pad(x, (0, size - len(x))))
-    H = fft(np.pad(h, (0, size - len(h))))
-    return ifft(X * H).real[:N]
+@log_dsp_action
+def fft_convolution(x, y):
+    """Быстрая свертка через БПФ."""
+    Nx, Ny = len(x), len(y)
+    Nz = Nx + Ny - 1
+    n_fft = 1 << (Nz - 1).bit_length() 
+    X = fft(np.pad(x, (0, n_fft - Nx)))
+    Y = fft(np.pad(y, (0, n_fft - Ny)))
+    result = ifft(X * Y)
+    return result.real[:Nz]
 
+@log_dsp_action
+@njit
 def correlation(x, y):
-    N, M = len(x), len(y)
-    res = np.zeros(N + M - 1)
-    for n in range(-(M - 1), N):
-        val = 0
-        for m in range(M):
-            if 0 <= n + m < N:
-                val += x[n + m] * y[m]
-        res[n + M - 1] = val
+    """Взаимная корреляция (NJIT-оптимизировано)."""
+    Nx, Ny = len(x), len(y)
+    Nz = Nx + Ny - 1
+    res = np.zeros(Nz, dtype=np.float64)
+    for lag_idx in range(Nz):
+        lag = lag_idx - (Ny - 1)
+        i_start = max(0, lag)
+        i_end = min(Nx, Ny + lag)
+        s = 0.0
+        for i in range(i_start, i_end):
+            s += x[i] * y[i - lag]
+        res[lag_idx] = s
     return res
 
+@log_dsp_action
 def fft_correlation(x, y):
-    N = len(x) + len(y) - 1
-    size = 1 << (N - 1).bit_length()
-    X = fft(np.pad(x, (0, size - len(x))))
-    Y = fft(np.pad(np.flip(y), (0, size - len(y))))
-    res = ifft(X * Y).real[:N]
-    return res
+    """Быстрая корреляция через спектры (согласно DSP_Old_Version)."""
+    Nx, Ny = len(x), len(y)
+    Nz = Nx + Ny - 1
+    n_fft = 1 << (Nz - 1).bit_length()
+    X = fft(np.pad(x, (0, n_fft - Nx)))
+    Y = fft(np.pad(y, (0, n_fft - Ny)))
+    raw_corr = ifft(X * np.conjugate(Y))
+    pos_lags = raw_corr[:Nx]
+    neg_lags = raw_corr[n_fft - (Ny - 1):]
+    return np.concatenate([neg_lags, pos_lags]).real

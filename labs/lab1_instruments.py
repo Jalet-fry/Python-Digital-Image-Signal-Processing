@@ -2,6 +2,7 @@ import sys
 import os
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.signal import fftconvolve
 
 # Настройка путей
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -35,8 +36,9 @@ def main():
     fig.canvas.manager.set_window_title(f'Лабораторная работа №1 - Вариант {VARIANT} ({cfg.x.name})')
     view = Lab1View(fig, cfg)
 
-    # 3. Обработчики событий
+    # 3. Обработчики событий (Восстановление старой логики)
     def on_change(label):
+        view.set_status(f"Selected: {label}")
         view.update_plots(label, processor.results)
 
     def on_play(event):
@@ -44,12 +46,15 @@ def main():
             view.set_status("Error: sounddevice not installed", color="red")
             return
         
-        view.set_status("Playing audio...", color="orange")
+        view.set_status("Processing audio...", color="orange")
         sd.stop()
         label = view.radio.value_selected
         
-        # Выбор сигнала: X или Y (или свертка если выбрана)
-        if 'Y' in label or 'y(t)' in label.lower():
+        # ЛОГИКА ИЗ СТАРОЙ ВЕРСИИ:
+        if 'Свертка' in label:
+            # Считаем свертку аудио-сигналов (как в оригинале)
+            sig = fftconvolve(processor.results['audio_x'], processor.results['audio_y'], mode='full')
+        elif 'Y' in label or 'y(t)' in label.lower():
             sig = processor.results['audio_y']
         else:
             sig = processor.results['audio_x']
@@ -58,17 +63,21 @@ def main():
         view.set_status(f"Playing: {label}", color="green")
 
     def on_save_wav(event):
-        view.set_status("Saving WAV files...", color="orange")
-        path = processor.save_wav(BASE_DIR)
-        view.set_status(f"WAV saved to: {path}", color="green")
+        view.set_status("Saving WAV...", color="orange")
+        try:
+            path = processor.save_wav(BASE_DIR)
+            view.set_status("WAV files saved!", color="darkgreen")
+        except Exception as e:
+            view.set_status(f"Save Error: {str(e)}", color="red")
 
     def on_save_res(event):
-        view.set_status("Saving current graph...", color="orange")
+        view.set_status("Saving graph...", color="orange")
         plots_dir = os.path.join(BASE_DIR, "results", "graphs")
         os.makedirs(plots_dir, exist_ok=True)
+        # Имя файла как в старой версии
         fname = f"var{VARIANT}_{view.radio.value_selected[:2].replace('.', '')}.png"
         fig.savefig(os.path.join(plots_dir, fname), dpi=150)
-        view.set_status(f"Graph saved: {fname}", color="green")
+        view.set_status("Graph saved!", color="darkgreen")
 
     # Привязка событий
     view.radio.on_clicked(on_change)

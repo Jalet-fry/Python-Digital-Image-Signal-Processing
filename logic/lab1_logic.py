@@ -97,7 +97,7 @@ class InstrumentProcessor:
         }
         return self.results
 
-    def save_wav_files(self, BASE_DIR):
+    def save_wav(self, BASE_DIR):
         audio_dir = os.path.join(BASE_DIR, "results", "audio")
         os.makedirs(audio_dir, exist_ok=True)
         wavfile.write(os.path.join(audio_dir, f"x_{self.cfg.x.name}.wav"), self.results['sr_audio'], np.int16(self.results['audio_x']/np.max(np.abs(self.results['audio_x'])) * 32767))

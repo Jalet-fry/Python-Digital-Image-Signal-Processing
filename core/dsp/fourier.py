@@ -1,6 +1,11 @@
 import numpy as np
+import sys
+
+# Увеличиваем лимит рекурсии (требование стабильности из DSP_Old_Version)
+sys.setrecursionlimit(10000)
 
 def dft(x):
+    """Классическое Дискретное Преобразование Фурье (O(N^2))."""
     N = len(x)
     n = np.arange(N)
     k = n.reshape((N, 1))
@@ -8,6 +13,7 @@ def dft(x):
     return np.dot(e, x)
 
 def idft(X):
+    """Обратное ДПФ."""
     N = len(X)
     n = np.arange(N)
     k = n.reshape((N, 1))
@@ -16,13 +22,13 @@ def idft(X):
 
 def fft(x):
     """
-    Быстрое преобразование Фурье. 
-    Автоматически дополняет сигнал нулями до степени 2, если это необходимо.
+    Быстрое Преобразование Фурье (Кули-Тьюки, O(N log N)).
+    Автоматически дополняет сигнал нулями до степени двойки.
     """
     x = np.asarray(x, dtype=complex)
     N = x.shape[0]
     
-    # Проверка на степень двойки (Cooley-Tukey требует N = 2^k)
+    # Cooley-Tukey требует N = 2^k
     if N > 1 and (N & (N - 1)) != 0:
         N_next = 1 << (N - 1).bit_length()
         x = np.pad(x, (0, N_next - N))
@@ -36,6 +42,7 @@ def fft(x):
     return np.concatenate([even + T, even - T])
 
 def ifft(X):
+    """Обратное БПФ через сопряжение."""
     N = len(X)
     X_conj = np.conjugate(X)
     x = fft(X_conj)

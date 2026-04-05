@@ -1,9 +1,8 @@
 import numpy as np
 from core.config import Lab1Config, InstrumentParams, Lab2Config, FIRParams, IIRParams, Lab3Config
 
-# ДАННЫЕ ИЗ ТАБЛИЦЫ МЕТОДИЧКИ (Варианты)
-# № 10: x(t)=Виолончель, y(t)=Контрабас
-LAB1_VARIANTS = {
+# ДАННЫЕ ИЗ ТАБЛИЦЫ МЕТОДИЧКИ (Ровно как в DSP_Old_Version)
+LAB1_DATA = {
     10: {
         'x': InstrumentParams(
             name='Виолончель', 
@@ -23,7 +22,7 @@ LAB1_VARIANTS = {
 }
 
 def get_lab1_config(variant: int = 10) -> Lab1Config:
-    data = LAB1_VARIANTS.get(variant, LAB1_VARIANTS[10])
+    data = LAB1_DATA.get(variant, LAB1_DATA[10])
     return Lab1Config(
         variant=variant,
         x=data['x'], 
@@ -31,10 +30,9 @@ def get_lab1_config(variant: int = 10) -> Lab1Config:
         N=1024,
         sr=10000,
         sr_audio=44100,
-        duration_audio=2.0
+        duration_audio=3.0 # Возвращаем оригинальную длительность
     )
 
-# Лаба 2 и 3 (оставляем пока как есть, но исправляем типы)
 def get_lab2_config(variant: int = 10) -> Lab2Config:
     return Lab2Config(
         M_ma=79,
