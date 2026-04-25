@@ -37,6 +37,20 @@ def show_menu():
         run_lab3()
     btn3.on_clicked(call_lab3)
 
+    # Лаб 4 (AI)
+    ax4 = plt.axes([0.2, 0.26, 0.6, 0.1])
+    btn4 = Button(ax4, 'ЛАБОРАТОРНАЯ №4: AI AUDIO', color='#805AD5', hovercolor=UIColors.TEXT_ACCENT)
+    def call_lab4(event):
+        import subprocess
+        python_lab4 = os.path.join(os.getcwd(), "venv_lab4", "Scripts", "python.exe")
+        if os.path.exists(python_lab4):
+            print("Запуск Лабораторной №4 через venv_lab4...")
+            subprocess.run([python_lab4, "labs/lab4_ai.py", "--task", "0"])
+        else:
+            print("ОШИБКА: Виртуальное окружение venv_lab4 не найдено.")
+            print("Пожалуйста, запустите 'make setup_lab4' в терминале.")
+    btn4.on_clicked(call_lab4)
+
     # Выход
     ax_exit = plt.axes([0.4, 0.15, 0.2, 0.06])
     btn_exit = Button(ax_exit, 'ВЫХОД', color='#C53030', hovercolor='#9B2C2C')

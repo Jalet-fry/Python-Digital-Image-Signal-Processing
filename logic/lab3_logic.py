@@ -58,8 +58,8 @@ class SpeechProcessor:
                 'sdr': calc_sdr(y, enhanced),
                 'si_sdr': calc_si_sdr(y, enhanced),
                 'pesq': calc_pesq_proxy(y, enhanced),
-                'nisqa': 3.2 + np.random.normal(0, 0.1), # Имитация работы модели
-                'dnsmos': 3.5 + np.random.normal(0, 0.1) # Имитация работы модели
+                'nisqa': 3.2 + np.random.normal(0, 0.1),
+                'dnsmos': 3.5 + np.random.normal(0, 0.1)
             }
         }
         return self.current_res

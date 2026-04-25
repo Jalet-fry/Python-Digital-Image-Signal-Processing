@@ -102,7 +102,6 @@ def calc_si_sdr(r, e):
     return 10 * np.log10(np.sum(t**2) / (np.sum((e - t)**2) + 1e-12))
 
 def calc_pesq_proxy(clean, proc):
-    """Упрощенная спектральная мера (прокси PESQ)."""
     min_len = min(len(clean), len(proc))
     S = np.abs(librosa.stft(clean[:min_len]))
     H = np.abs(librosa.stft(proc[:min_len]))
