@@ -97,7 +97,12 @@ class Lab4View:
         self.text_box.text_disp.set_color('white')
         self.btn_run_tts = Button(plt.axes([0.37, 0.42, 0.09, 0.035]), 'TTS', color='#238636')
         
-        self.ax_info = plt.axes([0.02, 0.08, 0.44, 0.30], facecolor='#0D1117')
+        # Кнопки для заданий 2.1, 2.3 и 2.4 (Методичка БГУИР)
+        self.btn_stability = Button(plt.axes([0.02, 0.37, 0.14, 0.04]), 'STAB. (2.3)', color='#1F6FEB')
+        self.btn_train_log = Button(plt.axes([0.17, 0.37, 0.14, 0.04]), 'LOGS (2.1)', color='#8957E5')
+        self.btn_compare = Button(plt.axes([0.32, 0.37, 0.14, 0.04]), 'COMP. (2.4)', color='#D29922')
+
+        self.ax_info = plt.axes([0.02, 0.08, 0.44, 0.28], facecolor='#0D1117')
         for spine in self.ax_info.spines.values(): spine.set_visible(True); spine.set_color('#30363D')
         self.ax_info.set_xticks([]); self.ax_info.set_yticks([])
         self.info_text = self.ax_info.text(0.02, 0.95, "Ready for processing...", 
@@ -109,6 +114,9 @@ class Lab4View:
         
         self.status_text = fig.text(0.02, 0.02, "● Ready", color=UIColors.TEXT_ACCENT, weight='bold', fontsize=9)
         self.k_slider.on_changed(lambda v: self.k_label.set_text(f"k-Neighbors: {int(v)}"))
+
+        # Для графиков экспериментов
+        self.ax_exp = None
 
     def clear_gui(self):
         self.ax_src.clear(); self.ax_tgt.clear(); self.ax_sim.clear()
@@ -137,5 +145,30 @@ class Lab4View:
         if sim_matrix is not None:
             data = sim_matrix.cpu().numpy()
             im = self.ax_sim.imshow(data, aspect='auto', origin='lower', cmap='viridis')
-            plt.colorbar(im, ax=self.ax_sim, fraction=0.046, pad=0.04)
+
+            # Фикс дублирования колорбара: если он уже есть, обновляем его
+            if not hasattr(self, 'cbar'):
+                self.cbar = self.fig.colorbar(im, ax=self.ax_sim, fraction=0.046, pad=0.04)
+                self.cbar.ax.yaxis.set_tick_params(color='white')
+                plt.setp(plt.getp(self.cbar.ax.axes, 'yticklabels'), color='white')
+            else:
+                self.cbar.update_normal(im)
+
+        self.fig.canvas.draw_idle()
+
+    def show_experiment_plot(self, x, y_list, labels, title, xlabel, ylabel):
+        """Отображает результаты эксперимента с поддержкой нескольких линий"""
+        self.ax_sim.clear()
+        colors = [UIColors.TEXT_ACCENT, '#FFA500', '#00FF00']
+
+        for i, y in enumerate(y_list):
+            self.ax_sim.plot(x, y, 'o-', color=colors[i % len(colors)],
+                           linewidth=2, label=labels[i])
+
+        UIColors.setup_axis(self.ax_sim, title, xlabel, ylabel)
+        self.ax_sim.grid(True, alpha=0.2)
+        if len(labels) > 1:
+            legend = self.ax_sim.legend(facecolor='#161B22', edgecolor='white', fontsize=8)
+            plt.setp(legend.get_texts(), color='white')
+
         self.fig.canvas.draw_idle()
