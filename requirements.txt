@@ -13,3 +13,11 @@ deepfilternet==0.5.6
 pydub
 static-ffmpeg
 imageio-ffmpeg
+TTS
+openai-whisper
+vector-quantize-pytorch
+matcha-tts
+inflect
+joblib
+gputil
+psutil
