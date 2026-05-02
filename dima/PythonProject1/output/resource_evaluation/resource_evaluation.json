@@ -1,0 +1,33 @@
+{
+  "whisper_models": {
+    "whisper_tiny": {
+      "time_seconds": 1.0824992656707764,
+      "ram_mb": 256.73046875,
+      "gpu_mb": 0.0,
+      "model_size": "tiny"
+    },
+    "whisper_base": {
+      "time_seconds": 1.5186090469360352,
+      "ram_mb": 298.69140625,
+      "gpu_mb": 0.0,
+      "model_size": "base"
+    },
+    "whisper_small": {
+      "time_seconds": 4.619272947311401,
+      "ram_mb": 1130.203125,
+      "gpu_mb": 0.0,
+      "model_size": "small"
+    }
+  },
+  "cpu_gpu": {},
+  "batch": {
+    "original": {
+      "time_seconds": 5.004320859909058,
+      "ram_mb": 305.26953125,
+      "gpu_mb": 0.0,
+      "file": "original",
+      "audio_duration": 2.1,
+      "output_file": "output\\resource_evaluation\\output_original.wav"
+    }
+  }
+}

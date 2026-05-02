@@ -1,0 +1,154 @@
+[
+  {
+    "duration": 1.0,
+    "text_length": 3,
+    "word_count": 1,
+    "source_metrics": {
+      "snr": 44.42389342622852,
+      "spectral_centroid": 852.0534473344914,
+      "energy": 1335.1815716224758,
+      "zcr": 0.07191666666666667
+    },
+    "output_metrics": {
+      "snr": 46.775303891962274,
+      "spectral_centroid": 550.6043705690516,
+      "energy": 835.8302532426833,
+      "zcr": 0.018908045977011494
+    },
+    "recognized_text": "его",
+    "output_file": "output\\length_experiment_results\\audio\\output_1.0s.wav"
+  },
+  {
+    "duration": 1.5,
+    "text_length": 19,
+    "word_count": 2,
+    "source_metrics": {
+      "snr": 43.30309781327418,
+      "spectral_centroid": 859.5466163178463,
+      "energy": 1540.6759270638074,
+      "zcr": 0.05213888888888889
+    },
+    "output_metrics": {
+      "snr": 48.462298073969265,
+      "spectral_centroid": 478.3023561963405,
+      "energy": 2218.4075726932338,
+      "zcr": 0.020566037735849058
+    },
+    "recognized_text": "лабораторная, но...",
+    "output_file": "output\\length_experiment_results\\audio\\output_1.5s.wav"
+  },
+  {
+    "duration": 2.0,
+    "text_length": 22,
+    "word_count": 3,
+    "source_metrics": {
+      "snr": 42.306458071483334,
+      "spectral_centroid": 947.2455777452457,
+      "energy": 1631.4427368815673,
+      "zcr": 0.05345833333333333
+    },
+    "output_metrics": {
+      "snr": 49.70468933239937,
+      "spectral_centroid": 628.7460274829494,
+      "energy": 3244.9335654321935,
+      "zcr": 0.03266081871345029
+    },
+    "recognized_text": "лабораторная номер чит",
+    "output_file": "output\\length_experiment_results\\audio\\output_2.0s.wav"
+  },
+  {
+    "duration": 2.5,
+    "text_length": 17,
+    "word_count": 3,
+    "source_metrics": {
+      "snr": 41.63113092442135,
+      "spectral_centroid": 935.3457561023213,
+      "energy": 1735.4804858627408,
+      "zcr": 0.046825
+    },
+    "output_metrics": {
+      "snr": 47.46500087970347,
+      "spectral_centroid": 620.8625068015385,
+      "energy": 1009.7248604779493,
+      "zcr": 0.023777777777777776
+    },
+    "recognized_text": "Это убрат letting",
+    "output_file": "output\\length_experiment_results\\audio\\output_2.5s.wav"
+  },
+  {
+    "duration": 3.0,
+    "text_length": 31,
+    "word_count": 5,
+    "source_metrics": {
+      "snr": 40.903311841570286,
+      "spectral_centroid": 929.3359428013083,
+      "energy": 1768.6546086634128,
+      "zcr": 0.043916666666666666
+    },
+    "output_metrics": {
+      "snr": 49.27711775046645,
+      "spectral_centroid": 562.2984099787474,
+      "energy": 3719.7654368580697,
+      "zcr": 0.02004566210045662
+    },
+    "recognized_text": "лабораторная номер 4 запись гол",
+    "output_file": "output\\length_experiment_results\\audio\\output_3.0s.wav"
+  },
+  {
+    "duration": 3.5,
+    "text_length": 34,
+    "word_count": 5,
+    "source_metrics": {
+      "snr": 40.28021375500816,
+      "spectral_centroid": 939.9112306992037,
+      "energy": 1782.1150360883244,
+      "zcr": 0.04667857142857143
+    },
+    "output_metrics": {
+      "snr": 48.978624750072385,
+      "spectral_centroid": 688.495376787713,
+      "energy": 3954.985579336914,
+      "zcr": 0.04442460317460317
+    },
+    "recognized_text": "лабораторная номер 4 запись голоса",
+    "output_file": "output\\length_experiment_results\\audio\\output_3.5s.wav"
+  },
+  {
+    "duration": 4.0,
+    "text_length": 34,
+    "word_count": 5,
+    "source_metrics": {
+      "snr": 39.660066231158204,
+      "spectral_centroid": 940.7726148297797,
+      "energy": 1782.1657164601231,
+      "zcr": 0.049770833333333334
+    },
+    "output_metrics": {
+      "snr": 48.929330699791564,
+      "spectral_centroid": 688.495376787713,
+      "energy": 3954.985579336914,
+      "zcr": 0.04442460317460317
+    },
+    "recognized_text": "лабораторная номер 4 запись голоса",
+    "output_file": "output\\length_experiment_results\\audio\\output_4.0s.wav"
+  },
+  {
+    "duration": 4.5,
+    "text_length": 34,
+    "word_count": 5,
+    "source_metrics": {
+      "snr": 39.153274126082415,
+      "spectral_centroid": 940.0882590461761,
+      "energy": 1782.1838894599139,
+      "zcr": 0.0500787037037037
+    },
+    "output_metrics": {
+      "snr": 48.94805068927109,
+      "spectral_centroid": 688.495376787713,
+      "energy": 3954.985579336914,
+      "zcr": 0.04442460317460317
+    },
+    "recognized_text": "лабораторная номер 4 запись голоса",
+    "output_file": "output\\length_experiment_results\\audio\\output_4.5s.wav"
+  }
+]
